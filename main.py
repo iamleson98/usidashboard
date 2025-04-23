@@ -1,10 +1,10 @@
-# from typing import Union, Annotated
 from fastapi.responses import FileResponse
-# from typing import List
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from api.employee import EmployeeRouter
+from api.attendance import CheckingEventApiRouter
+from api.breaking import BreakApiRouter
 from configs.env import get_environment_variables
 from metadata.tags import Tags
 
@@ -30,6 +30,8 @@ app.add_middleware(
 
 # Add routers
 app.include_router(EmployeeRouter)
+app.include_router(CheckingEventApiRouter)
+app.include_router(BreakApiRouter)
 
 @app.get("/")
 def read_root():

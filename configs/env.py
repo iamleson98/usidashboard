@@ -1,6 +1,6 @@
 from functools import lru_cache
 import os
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 @lru_cache
 def get_env_filename():
@@ -17,6 +17,7 @@ class EnvironmentSettings(BaseSettings):
     DB_PORT: int
     DB_USERNAME: str
     DEBUG_MODE: bool
+    AUTHORS: str
 
     class Config:
         env_file = get_env_filename()

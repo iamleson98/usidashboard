@@ -11,3 +11,6 @@ alembic upgrade <revision_code>
 - downgrade your migrations to previous migrations:
 
 alembic downgrade <down_revision_code>
+
+run:
+ `uvicorn main:app --reload`
