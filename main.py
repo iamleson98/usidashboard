@@ -4,9 +4,17 @@ from fastapi.responses import FileResponse
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from .api import router
+from api.employee import EmployeeRouter
+from configs.env import get_environment_variables
+from metadata.tags import Tags
 
-app = FastAPI()
+env = get_environment_variables()
+
+app = FastAPI(
+    title=env.APP_NAME,
+    version=env.API_VERSION,
+    openapi_tags=Tags,
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -20,7 +28,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+# Add routers
+app.include_router(EmployeeRouter)
 
 @app.get("/")
 def read_root():
