@@ -9,7 +9,7 @@ EmployeeRouter = APIRouter(
 )
 
 @EmployeeRouter.get("/", response_model=tp.List[EmployeeSchema])
-def index(
+def list(
     name: tp.Optional[str] = None,
     employeeService: EmployeeService = Depends()
 ):
@@ -17,5 +17,13 @@ def index(
 
 
 @EmployeeRouter.get("/{id}", response_model=EmployeeSchema)
-def get(id: str, employeeService: EmployeeService = Depends()):
-    pass
+def get(id: str, svc: EmployeeService = Depends()):
+    return svc.get_by_id(id)
+
+
+@EmployeeRouter.post("/", response_model=EmployeeSchema, status_code=status.HTTP_201_CREATED)
+def create(
+    employee: EmployeeSchema,
+    svc: EmployeeService = Depends(),
+):
+    return svc.create(employee)

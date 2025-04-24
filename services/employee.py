@@ -5,6 +5,7 @@ from dto.employee import EmployeeSchema
 import typing as tp
 from utils.types import Error
 
+
 class EmployeeService:
     employeeRepo: EmployeeRepo
 
@@ -19,3 +20,9 @@ class EmployeeService:
         return self.employeeRepo.create(
             Employee(**employee_body)
         )
+    
+    def bulk_create(self, employees: tp.List[EmployeeSchema]) -> tp.List[EmployeeSchema]:
+        pass
+
+    def get_by_id(self, id: str) -> Employee:
+        return self.employeeRepo.get_by_id(id, Employee)

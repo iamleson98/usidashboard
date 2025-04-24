@@ -2,6 +2,7 @@ from models.base import EntityMeta
 import sqlalchemy as sq
 from sqlalchemy.orm import relationship
 
+
 class Break(EntityMeta):
     __tablename__ = "breaks"
 
