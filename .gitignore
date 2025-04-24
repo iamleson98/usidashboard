@@ -1,3 +1,6 @@
 ./env
 __pycache__
 lab
+/__pycache__
+/.usidashboard
+/api/__pycache__
