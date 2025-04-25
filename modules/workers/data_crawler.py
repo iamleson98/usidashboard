@@ -26,7 +26,8 @@ class DataCrawlerWorker(threading.Timer):
             self.execute()
 
     def stop(self):
-        self.driver.quit()
+        if self.driver:
+            self.driver.quit()
         self.cancel()
 
     def execute(self):

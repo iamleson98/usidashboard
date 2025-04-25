@@ -18,7 +18,7 @@ def list(
 
 @EmployeeRouter.get("/{id}", response_model=EmployeeSchema)
 def get(id: str, svc: EmployeeService = Depends()):
-    return svc.get_by_id(id)
+    return svc.get_by_id(id).normalize()
 
 
 @EmployeeRouter.post("/", response_model=EmployeeSchema, status_code=status.HTTP_201_CREATED)

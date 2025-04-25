@@ -3,7 +3,7 @@ from repositories.employee import EmployeeRepo
 from models.employee import Employee
 from dto.employee import EmployeeSchema
 import typing as tp
-from utils.types import Error
+from utils.custom_types import Error
 
 
 class EmployeeService:

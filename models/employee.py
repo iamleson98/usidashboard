@@ -1,6 +1,7 @@
 from models.base import EntityMeta
 import sqlalchemy as sq
 from sqlalchemy.orm import relationship
+from dto.employee import EmployeeSchema
 
 
 class Employee(EntityMeta):
@@ -13,6 +14,17 @@ class Employee(EntityMeta):
     is_visitor = sq.Column(sq.Boolean, nullable=True, default=False)
     department = sq.Column(sq.String(500), nullable=False)
 
-    # checking_events = relationship('CheckingEvent', back_populates='employee')
+    checking_events = relationship('CheckingEvent', back_populates='employee')
 
     sq.PrimaryKeyConstraint(id)
+
+    def normalize(self):
+        """normalize returns basic information of an employee"""
+        return EmployeeSchema(
+            id=self.id,
+            first_name=self.first_name,
+            last_name=self.last_name,
+            card_no=self.card_no,
+            is_visitor=self.is_visitor,
+            department=self.department,
+        )

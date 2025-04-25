@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 import typing as tp
-from utils.types import Error
+from utils.custom_types import Error
 import re
 
 EMPLOYEE_ID_REGEX = re.compile(r"^(VN|TW|SH)\d{6}$")

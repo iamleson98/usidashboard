@@ -8,6 +8,7 @@ from api.breaking import BreakApiRouter
 from configs.env import get_environment_variables
 from metadata.tags import Tags
 from modules.workers.data_crawler import CRAWLER_WORKER
+from models.base import init
 
 env = get_environment_variables()
 
@@ -41,9 +42,10 @@ def read_root():
 @app.on_event("startup")
 def on_start_up():
     print("running startup functions")
+    init()
     CRAWLER_WORKER.start()
 
-@app.on_event("shitdown")
+@app.on_event("shutdown")
 def on_shutdown():
     print("running shutdown functions")
     CRAWLER_WORKER.stop()
