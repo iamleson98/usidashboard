@@ -1,4 +1,3 @@
-import csv
 import os
 import pandas as pd
 
@@ -9,24 +8,25 @@ DATA_DIR = os.path.join(PARENT_DIR, DATA_FOLDER_NAME)
 
 class CheckingEventParser(object):
     def __init__(self, file_name: str):
-        file_path = os.path.join(DATA_DIR, file_name)
-        if not os.path.exists(file_path):
+        self.file_path = os.path.join(DATA_DIR, file_name)
+        if not os.path.exists(self.file_path):
             raise Exception(f"path to file {file_name} does not exist")
 
         try:
-            dframe = pd.read_csv(filepath_or_buffer=file_path, sep=",", encoding="utf-8")
-            # data_content = open(file_path, 'r', encoding="utf-8")
-            # # print(data_content.read())
-            # csv_content = csv.reader(data_content)
-            # # # print(csv_content)
-            # for row in csv_content:
-            #     print(row)
-            print(dframe.head(10))
+            # first 7 rows contains un-related information
+            self.df = pd.read_excel(io=self.file_path, sheet_name="Sheet1", skiprows=0, engine='openpyxl')
 
         except Exception as e:
-            raise Exception(f"Failed to read content of file {file_path}. Error; {e}")
-        # finally:
-        #     data_content.close()
+            raise Exception(f"Failed to read content of file {self.file_path}. Error; {e}")
 
+    def logic_handle(self):
+        pass
 
-CheckingEventParser(file_name="Identity Access Search_2025_04_23_13_09_39_620.csv")
+    def cleanup(self):
+        """cleanup removes data files after use, to help save disk resource.
+        Only call the method after you are done with data processing."""
+        try:
+            os.remove(self.file_path)
+        except Exception as e:
+            raise Exception(f"Failed to delete file: {self.file_path}")
+

@@ -7,6 +7,7 @@ from api.attendance import CheckingEventApiRouter
 from api.breaking import BreakApiRouter
 from configs.env import get_environment_variables
 from metadata.tags import Tags
+from modules.workers.data_crawler import CRAWLER_WORKER
 
 env = get_environment_variables()
 
@@ -37,3 +38,12 @@ app.include_router(BreakApiRouter)
 def read_root():
     return FileResponse("static/index.html")
 
+@app.on_event("startup")
+def on_start_up():
+    print("running startup functions")
+    CRAWLER_WORKER.start()
+
+@app.on_event("shitdown")
+def on_shutdown():
+    print("running shutdown functions")
+    CRAWLER_WORKER.stop()
