@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session, lazyload
 from fastapi import Depends
 from configs.db import get_db_connection
 from typing import TypeVar, Generic, Optional
-from models.employee import Employee
+# from models.employee import Employee
+import typing as tp
 
 # Type definition for Model
 M = TypeVar("M")
@@ -21,6 +22,10 @@ class BaseRepo(Generic[M, K]):
         self.db.commit()
         self.db.refresh(instance)
         return instance
+    
+    def bulk_create(self, instances: tp.List[M]):
+        self.db.bulk_save_objects(instances)
+        self.db.commit()
 
     def delete(self, instance: M):
         self.db.delete(instance)

@@ -13,3 +13,5 @@ class CheckingEventSchema(BaseModel):
 class CheckingEventSearch(BaseModel):
     ids: tp.Optional[list[int]]
     employee_id: tp.Optional[str]
+    offset: tp.Optional[int]
+    limit: tp.Optional[int]

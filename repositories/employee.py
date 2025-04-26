@@ -6,13 +6,6 @@ from dto.employee import EmployeeSearch
 
 
 class EmployeeRepo(BaseRepo):
-    # def get(self, id: str) -> Employee:
-    #     self.db.get(
-    #         Employee,
-    #         id,
-    #         # options=[lazyload(Employee.checking_events)]
-    #     )
-
     def list_employees(self, opts: EmployeeSearch):
         query = self.db.query(Employee)
 
@@ -24,21 +17,3 @@ class EmployeeRepo(BaseRepo):
             query = query.filter(Employee.last_name.ilike(f"%{opts.last_name}%"))
 
         return query.limit(opts.limit).offset(opts.offset).all()
-
-    # def create(self, employee: Employee) -> Employee:
-    #     self.db.add(employee)
-    #     self.db.commit()
-    #     self.db.refresh(employee)
-    #     return employee
-
-    # def update(self, id: str, employee: Employee) -> Employee:
-    #     employee.id = id
-    #     self.db.merge(employee)
-    #     self.db.commit()
-    #     return employee
-
-    # def delete(self, employee: Employee) -> bool:
-    #     self.db.delete(employee)
-    #     self.db.commit()
-    #     self.db.flush()
-    #     return True

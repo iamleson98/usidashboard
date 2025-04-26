@@ -1,13 +1,21 @@
-import threading
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ActionChains
 import time
+import os
 
 from selenium.webdriver.chrome.options import Options
 
 driver_options = Options()
 driver_options.add_argument("--headless=new")
+
+# The Hk web requires a client tool to be installed before we can connect and export checking data
+# When we export, that tool save to folder "C:\Users\Public\HCWebControlService" on windows
+
+if os.name == 'nt':
+    DATA_FOLDER_PATH = r"C:\Users\Public\HCWebControlService"
+else:
+    DATA_FOLDER_PATH = "unknown"
 
 class DataCrawlerWorker:
     USER_NAME = "PDVIP"
@@ -21,7 +29,7 @@ class DataCrawlerWorker:
         if self.driver:
             self.driver.quit()
 
-    def execute(self):
+    def __crawl_data(self):
         self.driver = webdriver.Chrome(options=driver_options)
         self.driver.get(self.URL)
         self.driver.implicitly_wait(4)
@@ -69,9 +77,18 @@ class DataCrawlerWorker:
 
         # get file name
         first_elem = self.driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
-        print(first_elem.text)
 
         self.driver.quit()
+
+        # after saved, we need the path to excel file, to process data
+        return first_elem.text
+    
+    def __handle_data(self):
+        pass
+
+    def execute(self):
+        file_name = self.__crawl_data()
+        self.__handle_data(file_name)
 
     def findElement(self, Xpath, actions=[], var=''):
         element_box = self.driver.find_element(By.XPATH, Xpath)

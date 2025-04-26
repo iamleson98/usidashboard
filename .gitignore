@@ -5,3 +5,4 @@ lab
 /.usidashboard
 /api/__pycache__
 data
+.env
