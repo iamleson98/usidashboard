@@ -1,5 +1,3 @@
-# from sqlalchemy.orm import Session, lazyload
-# from configs.db import get_db_connection
 from models.employee import Employee
 from repositories.base import BaseRepo
 from dto.employee import EmployeeSearch
