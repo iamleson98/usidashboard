@@ -1,14 +1,13 @@
 from pydantic import BaseModel
-from datetime import time
+from datetime import datetime
 import typing as tp
+
 
 class CheckingEventSchema(BaseModel):
     id: int
     employee_id: str
-    in_time: tp.Optional[time]
-    out_time: tp.Optional[time]
-    minutes: float
-    break_type_id: int
+    type: int
+    time: datetime
 
 
 class CheckingEventSearch(BaseModel):

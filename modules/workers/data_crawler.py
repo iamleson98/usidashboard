@@ -9,26 +9,17 @@ from selenium.webdriver.chrome.options import Options
 driver_options = Options()
 driver_options.add_argument("--headless=new")
 
-def noop():
-    pass
-
-class DataCrawlerWorker(threading.Timer):
+class DataCrawlerWorker:
     USER_NAME = "PDVIP"
     PASSWORD = "USIVIP@2025"
     URL = "http://10.53.232.80/#/"
 
-    def __init__(self, interval, function = noop, args = None, kwargs = None):
-        super().__init__(interval, function, args, kwargs)
+    def __init__(self):
         self.driver = None
-
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.execute()
 
     def stop(self):
         if self.driver:
             self.driver.quit()
-        self.cancel()
 
     def execute(self):
         self.driver = webdriver.Chrome(options=driver_options)
@@ -71,7 +62,7 @@ class DataCrawlerWorker(threading.Timer):
         self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[2]/div[1]/button')
         #click csv radio button
         time.sleep(1)
-        self.findElement('.//*[@id="accessControl"]/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[2]/div[2]/label')
+        self.findElement('.//*[@id="accessControl"]/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[2]/div[1]/label')
 
         #click save button
         self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[3]/button')
@@ -94,6 +85,4 @@ class DataCrawlerWorker(threading.Timer):
             .double_click(element_click) \
             .perform()
 
-FIVE_MINS = 5 * 60
-
-CRAWLER_WORKER = DataCrawlerWorker(FIVE_MINS)
+CRAWLER_WORKER = DataCrawlerWorker()

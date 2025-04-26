@@ -9,13 +9,29 @@ from configs.env import get_environment_variables
 from metadata.tags import Tags
 from modules.workers.data_crawler import CRAWLER_WORKER
 from models.base import init
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from contextlib import asynccontextmanager
+
 
 env = get_environment_variables()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = AsyncIOScheduler()
+    trigger = IntervalTrigger(seconds=2)
+    scheduler.add_job(CRAWLER_WORKER.execute, trigger)
+    scheduler.start()
+    init()
+    yield
+    scheduler.shutdown()
 
 app = FastAPI(
     title=env.APP_NAME,
     version=env.API_VERSION,
     openapi_tags=Tags,
+    lifespan=lifespan,
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -38,14 +54,3 @@ app.include_router(BreakApiRouter)
 @app.get("/")
 def read_root():
     return FileResponse("static/index.html")
-
-@app.on_event("startup")
-def on_start_up():
-    print("running startup functions")
-    init()
-    CRAWLER_WORKER.start()
-
-@app.on_event("shutdown")
-def on_shutdown():
-    print("running shutdown functions")
-    CRAWLER_WORKER.stop()
