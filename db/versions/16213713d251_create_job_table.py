@@ -14,7 +14,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision: str = '16213713d251'
-down_revision: Union[str, None] = '8b508513d5e2'
+down_revision: Union[str, None] = 'e258d6a4a319'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -26,9 +26,9 @@ def upgrade() -> None:
         JOB_TABLES,
         sa.Column("id", sa.BigInteger, autoincrement=True, primary_key=True, nullable=False),
         sa.Column('job_type', sa.String(100), nullable=False),
-        sa.Column('execution_at', sa.DateTime, default=datetime),
+        sa.Column('execution_at', sa.DateTime, default=datetime.now, nullable=False),
         sa.Column('status', sa.Boolean, nullable=False),
-        sa.Column('reason', sa.String(1000), nullable=True),
+        sa.Column('reason', sa.String(5000), nullable=True),
     )
 
 

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 import typing as tp
-from dto.checking_events import CheckingEventSchema, CheckingEventSearch
+from dto.checking_events import CheckingEventSchema
 from services.checking_event import CheckingEventService
+from repositories.checkout_events import CheckoutEventRepo
 
 
 CheckingEventApiRouter = APIRouter(
@@ -14,9 +15,9 @@ async def search_checking_events(
     limit: tp.Optional[int] = 100,
     employee_id: tp.Optional[int] = None,
     # ids: tp.Optional[tp.List[int]] = None,
-    svc: CheckingEventService = Depends()
+    svc: CheckoutEventRepo = Depends()
 ):
-    checking_events = svc.find_checking_events_by_employee(employee_id, offset, limit)
+    checking_events = svc.find_by_employee_id(employee_id, offset, limit)
     return [
         evt.normalize()
         for evt in checking_events

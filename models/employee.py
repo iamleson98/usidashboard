@@ -28,3 +28,14 @@ class Employee(EntityMeta):
             is_visitor=self.is_visitor,
             department=self.department,
         )
+    
+    @staticmethod
+    def from_dto(employee: EmployeeSchema) -> "Employee":
+        return Employee(
+            id=employee.id,
+            first_name=employee.first_name,
+            last_name=employee.last_name,
+            card_no=employee.card_no,
+            is_visitor=employee.is_visitor,
+            department=employee.department,
+        )

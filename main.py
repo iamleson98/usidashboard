@@ -12,6 +12,7 @@ from models.base import init
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
+from api.ws import SocketRouter
 
 
 env = get_environment_variables()
@@ -20,7 +21,7 @@ env = get_environment_variables()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    trigger = IntervalTrigger(seconds=20)
+    trigger = IntervalTrigger(seconds=300) # 5 mins
     scheduler.add_job(CRAWLER_WORKER.execute, trigger)
     scheduler.start()
     init()
@@ -50,6 +51,7 @@ app.add_middleware(
 app.include_router(EmployeeRouter)
 app.include_router(CheckingEventApiRouter)
 app.include_router(BreakApiRouter)
+app.include_router(SocketRouter)
 
 @app.get("/")
 def read_root():

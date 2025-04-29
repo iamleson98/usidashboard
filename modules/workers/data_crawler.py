@@ -4,19 +4,20 @@ from selenium.webdriver import ActionChains
 import time
 import os
 from selenium.webdriver.chrome.options import Options
-from services.checking_event import CheckingEventService
-from services.employee import EmployeeService
-from services.job import JobService
+from repositories.checkout_events import CheckoutEventRepo
+from repositories.employee import EmployeeRepo
 import pandas as pd
 from modules.workers.base_worker import BaseWorker
 from utils.consts import CRAWLER_JOB_TYPE
 from models.checking_event import CheckingEvent
 from models.employee import Employee
-from sqlalchemy.exc import IntegrityError
 from datetime import datetime
+import subprocess
+
 
 driver_options = Options()
 driver_options.add_argument("--headless=new")
+driver_options.add_argument("--window-size=1366,768")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
 # When we export, that tool save to folder "C:\Users\Public\HCWebControlService" on windows
@@ -35,17 +36,29 @@ ACCESS_POINT = "Access Point"
 TIME = "Time"
 DEPARTMENT = "Department"
 
+def change_file_write_permissions(path: str):
+    """grant write permission on files on Windows"""
+    cmd = f'icacls "{path}" /grant Everyone:(W)'
+    try:
+        result = subprocess.run(cmd, shell=True, check=True)
+        if result.returncode == 0:
+            return True
+        return False
+    except Exception:
+        return False
+
 class DataCrawlerWorker(BaseWorker):
     USER_NAME = "PDVIP"
     PASSWORD = "USIVIP@2025"
     URL = "http://10.53.232.80/#/"
     SHEET_NAME = "Sheet1"
 
-    def __init__(self):
-        self.checkingSvc = CheckingEventService()
-        self.jobSvc = JobService()
-        self.employeeSvc = EmployeeService()
+    def __init__(
+        self, 
+    ):
         super().__init__()
+        self.checkingEventRepo = CheckoutEventRepo(self.db)
+        self.employeeRepo = EmployeeRepo(self.db)
 
     def stop(self):
         if self.driver:
@@ -99,11 +112,13 @@ class DataCrawlerWorker(BaseWorker):
             self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[3]/button')
 
             # get file name
+            time.sleep(4)
             first_elem = self.driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
+            file_name = first_elem.text
 
             self.driver.quit()
 
-            return first_elem.text, None
+            return file_name, None
         except Exception as e:
             return None, e
 
@@ -121,24 +136,27 @@ class DataCrawlerWorker(BaseWorker):
                 is_visitor = is_visitor,
                 department = item.get(DEPARTMENT),
             )
-            self.employeeSvc.create(new_employee)
-        except IntegrityError:
+            self.employeeRepo.create(new_employee)
+        except Exception:
             # already exist, dont raise
             return
-        except Exception as e:
-            raise e
-    
+
     def __handle_data(self, file_name: str):
-        full_file_path = os.path.join(DATA_FOLDER_PATH, file_name)
+        time.sleep(5) # wait for the file to get ready
+
+        full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
         try:
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
-            latest_job = self.jobSvc.get_latest_job()
+            latest_job = self.jobRepo.get_last_job(only_success=True)
 
             for _, item in dframe.iterrows():
-                # we only process checking records that happend when or after last job run
+                # we only process checking records that happend when or after last job success run
                 # This helps we avoid doing unnecessasy process
                 check_time = item.get(TIME)
+                if check_time is None:
+                    continue
+
                 check_time = datetime.strptime(check_time, "%Y-%m-%d %H:%M:%S")
                 if latest_job and latest_job.execution_at > check_time:
                     continue
@@ -159,11 +177,12 @@ class DataCrawlerWorker(BaseWorker):
                 check_evt = CheckingEvent(
                     employee_id=employee_id,
                     type=type_,
+                    time=check_time,
                 )
 
                 self.__try_insert_employee(item)
 
-                self.checkingSvc.create(check_evt)
+                self.checkingEventRepo.create(check_evt)
         except Exception as e:
             return e
 

@@ -1,9 +1,6 @@
-from fastapi import FastAPI
 import pandas as pd
 import json
-from openpyxl import Workbook
 from openpyxl.styles import PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl import load_workbook
 import os
 from datetime import datetime

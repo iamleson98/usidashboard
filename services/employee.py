@@ -22,7 +22,7 @@ class EmployeeService(BaseService):
         return self.employeeRepo.create(
             Employee(**employee_body)
         )
-    
+
     def bulk_create(self, employees: tp.List[EmployeeSchema]) -> tp.List[EmployeeSchema]:
         pass
 
