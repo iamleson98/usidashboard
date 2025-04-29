@@ -9,7 +9,7 @@ class CheckingEvent(EntityMeta):
 
     id = sq.Column(sq.BigInteger, nullable=False, primary_key=True, autoincrement=True)
     employee_id = sq.Column(sq.String(length=12), sq.ForeignKey("employees.id"))
-    type = sq.Column(sq.SmallInteger, nullable=True) # 1 means checking in, 0 mean checking out
+    is_checkin = sq.Column(sq.Boolean, nullable=True) # 1 means checking in, 0 mean checking out
     time = sq.Column(sq.DateTime, nullable=False)
 
     employee = relationship(
@@ -23,6 +23,6 @@ class CheckingEvent(EntityMeta):
         return CheckingEventSchema(
             id=self.id,
             employee_id=self.employee_id,
-            type=self.type,
+            is_checkin=self.is_checkin,
             time=self.time
         )

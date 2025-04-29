@@ -26,7 +26,7 @@ def upgrade() -> None:
         TABLE_NAME,
         sa.Column('id', sa.BigInteger, primary_key=True, nullable=False, autoincrement=True),
         sa.Column('employee_id', sa.String(length=12), nullable=False),
-        sa.Column('type', sa.SmallInteger, nullable=True), # checking in
+        sa.Column('is_checkin', sa.Boolean, nullable=True), # if 1, check in, if 0, check out
         sa.Column('time', sa.DateTime, nullable=False),
     )
 

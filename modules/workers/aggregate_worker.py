@@ -53,7 +53,7 @@ class DataAggregateWorker(BaseWorker):
             meet_map = {}
 
             for event in checking_events:
-                if event and event.type == 1: # check in
+                if event and event.is_checkin: # check in
                     if meet_map.get(event.employee_id, None) is None:
                         meet_map[event.employee_id] = 1
                         continue

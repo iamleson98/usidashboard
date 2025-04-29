@@ -170,13 +170,13 @@ class DataCrawlerWorker(BaseWorker):
                     continue
 
                 checking_type = f"{checking_type}".lower()
-                type_ = 1
+                is_checkin = True
                 if "face" not in checking_type: # means check out
-                    type_ = 0
+                    is_checkin = False
 
                 check_evt = CheckingEvent(
                     employee_id=employee_id,
-                    type=type_,
+                    is_checkin=is_checkin,
                     time=check_time,
                 )
 

@@ -21,7 +21,7 @@ env = get_environment_variables()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    trigger = IntervalTrigger(seconds=300) # 5 mins
+    trigger = IntervalTrigger(minutes=env.DATA_CRAWLER_INTERVAL_MINS)
     scheduler.add_job(CRAWLER_WORKER.execute, trigger)
     scheduler.start()
     init()

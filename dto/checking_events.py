@@ -6,7 +6,7 @@ import typing as tp
 class CheckingEventSchema(BaseModel):
     id: int
     employee_id: str
-    type: int
+    is_checkin: bool
     time: datetime
 
 
