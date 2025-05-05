@@ -11,13 +11,15 @@ from modules.workers.base_worker import BaseWorker
 from utils.consts import CRAWLER_JOB_TYPE
 from models.checking_event import CheckingEvent
 from models.employee import Employee
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
+from repositories.abnormal_checking import AbnormalCheckingRepo
+from models.abnormal_checking import AbnormalChecking
 
 
 driver_options = Options()
-driver_options.add_argument("--headless=new")
-driver_options.add_argument("--window-size=1366,768")
+# driver_options.add_argument("--headless=new")
+driver_options.add_argument("--window-size=1200,768")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
 # When we export, that tool save to folder "C:\Users\Public\HCWebControlService" on windows
@@ -35,6 +37,8 @@ PERSON_VISITOR = "Person/Visitor"
 ACCESS_POINT = "Access Point"
 TIME = "Time"
 DEPARTMENT = "Department"
+ALLOWED_GAP_MINS = 10
+
 
 def change_file_write_permissions(path: str):
     """grant write permission on files on Windows"""
@@ -59,6 +63,7 @@ class DataCrawlerWorker(BaseWorker):
         super().__init__()
         self.checkingEventRepo = CheckoutEventRepo(self.db)
         self.employeeRepo = EmployeeRepo(self.db)
+        self.abnormalRepo = AbnormalCheckingRepo(self.db)
 
     def stop(self):
         if self.driver:
@@ -68,7 +73,7 @@ class DataCrawlerWorker(BaseWorker):
         try:
             self.driver = webdriver.Chrome(options=driver_options)
             self.driver.get(self.URL)
-            self.driver.implicitly_wait(4)
+            self.driver.implicitly_wait(10)
 
             #username input
             self.findElement('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],self.USER_NAME)
@@ -142,13 +147,29 @@ class DataCrawlerWorker(BaseWorker):
             return
 
     def __handle_data(self, file_name: str):
-        time.sleep(5) # wait for the file to get ready
-
+        # wait for file to ready:
         full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
+        tries = 1
+        file_exist = os.path.exists(full_file_path)
+        total_tries = 3
+
+        while not file_exist and tries <= total_tries:
+            time.sleep(tries * 2)
+            file_exist = os.path.exists(full_file_path)
+            tries += 1
+
+        if not file_exist:
+            return FileNotFoundError(f"the file path {full_file_path} does not exist.")
+
         try:
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
-            latest_job = self.jobRepo.get_last_job(only_success=True)
+            latest_success_job = self.jobRepo.get_last_job(only_success=True)
+
+            dframe = dframe.sort_values(by=[TIME], ascending=True)
+
+            meet_map = {}
+            checkins_without_checkout_data: list[CheckingEvent] = []
 
             for _, item in dframe.iterrows():
                 # we only process checking records that happend when or after last job success run
@@ -157,8 +178,8 @@ class DataCrawlerWorker(BaseWorker):
                 if check_time is None:
                     continue
 
-                check_time = datetime.strptime(check_time, "%Y-%m-%d %H:%M:%S")
-                if latest_job and latest_job.execution_at > check_time:
+                check_time = datetime.strptime(check_time.strip(), "%Y-%m-%d %H:%M:%S")
+                if latest_success_job and latest_success_job.execution_at > check_time:
                     continue
 
                 employee_id = item.get(PERSON_NO, None)
@@ -169,10 +190,9 @@ class DataCrawlerWorker(BaseWorker):
                 if not checking_type:
                     continue
 
-                checking_type = f"{checking_type}".lower()
-                is_checkin = True
-                if "face" not in checking_type: # means check out
-                    is_checkin = False
+                is_checkin = "face" in f"{checking_type}".lower()
+
+                self.__try_insert_employee(item)
 
                 check_evt = CheckingEvent(
                     employee_id=employee_id,
@@ -180,27 +200,85 @@ class DataCrawlerWorker(BaseWorker):
                     time=check_time,
                 )
 
-                self.__try_insert_employee(item)
+                if is_checkin:
+                    last_checkout_time = meet_map.get(employee_id, None)
+                    if last_checkout_time is None:
+                        # meaning there is no last checkout data
+                        checkins_without_checkout_data.append(check_evt)
+                    else:
+                        gap_time = check_time - last_checkout_time
+                        gap_mins = gap_time.total_seconds() / 60
+                        if gap_mins > ALLOWED_GAP_MINS:
+                            # abnormal
+                            # insert to database for reporting
+                            abnormal_checking_record = AbnormalChecking(
+                                employee_id=employee_id,
+                                in_time=check_time,
+                                out_time=last_checkout_time,
+                                total_mins=gap_mins,
+                            )
+                            self.abnormalRepo.create(abnormal_checking_record)
 
-                self.checkingEventRepo.create(check_evt)
+                        # remove data from map
+                        del meet_map[employee_id]
+                else:
+                    # check out, insert to meet map
+                    meet_map[employee_id] = check_time
+
+
+            # done parsing file, begin handling missing data
+
+            for event in checkins_without_checkout_data:
+                # find last check out for each event
+                last_checkout: CheckingEvent = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
+                if last_checkout:
+                    gap_time = event.time - last_checkout.time
+                    gap_mins = gap_time.total_seconds() / 60
+                    if gap_mins > ALLOWED_GAP_MINS:
+                        abnormal_checking_record = AbnormalChecking(
+                            employee_id=event.employee_id,
+                            in_time=event.time,
+                            out_time=last_checkout.time,
+                            total_mins=gap_mins,
+                        )
+                        self.abnormalRepo.create(abnormal_checking_record)
+            
+            if len(meet_map) > 0:
+                # meaning some check outs do not have checkin events yet, just save them to database for later reference
+                for (employee_id, checkout_time) in meet_map.items():
+                    check_evt = CheckingEvent(
+                        employee_id=employee_id,
+                        is_checkin=False,
+                        time=checkout_time,
+                    )
+                    self.checkingEventRepo.create(check_evt)
+
         except Exception as e:
             return e
 
     def execute(self):
-        file_name, error = self.__crawl_data()
-        if error:
-            reason = f"{error}"
-            self.set_job_error(CRAWLER_JOB_TYPE, reason)
-            return
+        tries = 0
+        total_tries = 3
 
-        error = self.__handle_data(file_name)
-        if error:
-            reason = f"{error}"
-            self.set_job_error(CRAWLER_JOB_TYPE, reason)
+        while tries < total_tries:
+            file_name, error = self.__crawl_data()
+            if error:
+                reason = f"{error}"
+                self.set_job_error(CRAWLER_JOB_TYPE, reason)
+                self.stop()
+                tries += 1
+                continue
+
+            error = self.__handle_data(file_name)
+            if error:
+                reason = f"{error}"
+                self.set_job_error(CRAWLER_JOB_TYPE, reason)
+                tries += 1
+                continue
+
+            self.set_job_success(CRAWLER_JOB_TYPE)
+            self.stop()
             return
-        
-        self.set_job_success(CRAWLER_JOB_TYPE)
-        return
 
     def findElement(self, Xpath, actions=[], var=''):
         element_box = self.driver.find_element(By.XPATH, Xpath)

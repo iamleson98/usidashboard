@@ -27,7 +27,7 @@ class DataAggregateWorker(BaseWorker):
             min=0,
             second=0,
         )
-        end_time = start_time = datetime(
+        end_time = datetime(
             year=date_to_run.year, 
             month=date_to_run.month,
             day=date_to_run.day,

@@ -15,6 +15,10 @@ class Employee(EntityMeta):
     department = sq.Column(sq.String(500), nullable=False)
 
     checking_events = relationship('CheckingEvent', back_populates='employee')
+    abnormals = relationship(
+        "AbnormalChecking",
+        back_populates="employee",
+    )
 
     sq.PrimaryKeyConstraint(id)
 

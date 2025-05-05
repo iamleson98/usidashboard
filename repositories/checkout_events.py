@@ -33,3 +33,47 @@ class CheckoutEventRepo(BaseRepo):
             query = query.order_by(desc(CheckingEvent.time))
 
         return query.all()
+    
+    def dedup_data(self):
+        """we dont allow duplication on the 3 fields (employee_id, is_checkin, time) of table checking_events"""
+
+        TABLE_NAME = "checking_events"
+        employee_id = "employee_id"
+        is_checkin = "is_checkin"
+        time = "time"
+
+        query = f"""
+        WITH CTE AS (
+            SELECT
+                {employee_id},
+                {is_checkin},
+                {time},
+                ROW_NUMBER() OVER (PARTITION BY {employee_id}, {is_checkin}, {time} ORDER BY {time}) as row_num
+            FROM {TABLE_NAME}
+        )
+        DELETE FROM {TABLE_NAME}
+        WHERE ({employee_id}, {is_checkin}, {time}) IN (
+            SELECT
+                {employee_id},
+                {is_checkin},
+                {time}
+            FROM CTE
+            WHERE row_num > 1
+        )
+        """
+        try:
+            self.db.execute(query)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+
+    def find_last_checking_event_by_employee_id(self, id: str, check_in = False):
+        """returns the latest check in/out event of given employee"""
+        checking_events = self.db.query(CheckingEvent).\
+            filter(CheckingEvent.is_checkin == check_in, CheckingEvent.employee_id == id).\
+                order_by(desc(CheckingEvent.time)).limit(1).all()
+
+        if len(checking_events):
+            return checking_events[0]
+        return None
+    
