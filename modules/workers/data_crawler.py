@@ -125,6 +125,7 @@ class DataCrawlerWorker(BaseWorker):
 
             return file_name, None
         except Exception as e:
+            self.stop()
             return None, e
 
     def __try_insert_employee(self, item: dict):
@@ -146,7 +147,7 @@ class DataCrawlerWorker(BaseWorker):
             # already exist, dont raise
             return
 
-    def __handle_data(self, file_name: str):
+    def handle_data(self, file_name: str):
         # wait for file to ready:
         full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
         tries = 1
@@ -265,11 +266,10 @@ class DataCrawlerWorker(BaseWorker):
             if error:
                 reason = f"{error}"
                 self.set_job_error(CRAWLER_JOB_TYPE, reason)
-                self.stop()
                 tries += 1
                 continue
 
-            error = self.__handle_data(file_name)
+            error = self.handle_data(file_name)
             if error:
                 reason = f"{error}"
                 self.set_job_error(CRAWLER_JOB_TYPE, reason)
