@@ -5,5 +5,6 @@
 <template>
   <main>
     <!-- <TheWelcome /> -->
+     lol
   </main>
 </template>

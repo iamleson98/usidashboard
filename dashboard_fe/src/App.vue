@@ -14,8 +14,12 @@ const openKeys = ref<string[]>(['sub1']);
       <div class="logo"></div>
       <a-menu v-model:selectedKeys="selectedKeys1" theme="dark" mode="horizontal" :style="{ lineHeight: '64px' }">
         <a-menu-item key="1">USI</a-menu-item>
-        <a-menu-item key="2">Home</a-menu-item>
-        <a-menu-item key="3">About</a-menu-item>
+        <a-menu-item key="2">
+          <a href="/">Home</a>
+        </a-menu-item>
+        <a-menu-item key="3">
+          <a href="/about">About</a>
+        </a-menu-item>
       </a-menu>
     </a-layout-header>
     <a-layout>
@@ -60,7 +64,7 @@ const openKeys = ref<string[]>(['sub1']);
           </a-sub-menu> -->
         </a-menu>
       </a-layout-sider>
-      <a-layout style="padding: 0 24px 24px">
+      <a-layout style="padding: 0 24px 24px; height: 100%;">
         <a-breadcrumb style="margin: 16px 0">
           <a-breadcrumb-item>Home</a-breadcrumb-item>
           <a-breadcrumb-item>List</a-breadcrumb-item>
