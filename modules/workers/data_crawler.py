@@ -18,7 +18,7 @@ from models.abnormal_checking import AbnormalChecking
 
 
 driver_options = Options()
-# driver_options.add_argument("--headless=new")
+driver_options.add_argument("--headless=new")
 driver_options.add_argument("--window-size=1200,768")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
@@ -64,6 +64,7 @@ class DataCrawlerWorker(BaseWorker):
         self.checkingEventRepo = CheckoutEventRepo(self.db)
         self.employeeRepo = EmployeeRepo(self.db)
         self.abnormalRepo = AbnormalCheckingRepo(self.db)
+        self._run = True
 
     def stop(self):
         if self.driver:
@@ -258,6 +259,9 @@ class DataCrawlerWorker(BaseWorker):
             return e
 
     def execute(self):
+        if not self._run:
+            return
+
         tries = 0
         total_tries = 3
 
@@ -291,5 +295,10 @@ class DataCrawlerWorker(BaseWorker):
         ActionChains(self.driver) \
             .double_click(element_click) \
             .perform()
+        
+    def toggle_status(self, on: bool):
+        """programmatically turn your job on or off"""
+        self._run = on
+
 
 CRAWLER_WORKER = DataCrawlerWorker()

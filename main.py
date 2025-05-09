@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.employee import EmployeeRouter
 from api.attendance import CheckingEventApiRouter
 from api.breaking import BreakApiRouter
+from api.job import JobRouter
 from configs.env import get_environment_variables
 from metadata.tags import Tags
 from modules.workers.data_crawler import CRAWLER_WORKER
@@ -50,6 +51,7 @@ app.include_router(EmployeeRouter)
 app.include_router(CheckingEventApiRouter)
 app.include_router(BreakApiRouter)
 app.include_router(SocketRouter)
+app.include_router(JobRouter)
 
 @app.get("/")
 def read_root():

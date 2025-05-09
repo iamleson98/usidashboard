@@ -2,6 +2,8 @@ from pydantic import BaseModel
 import typing as tp
 from utils.custom_types import Error
 import re
+from enum import Enum
+from dto.common import OrderDirection
 
 EMPLOYEE_ID_REGEX = re.compile(r"^(VN|TW|SH)\d{6}$")
 
@@ -26,6 +28,12 @@ class EmployeeSchema(BaseModel):
         return None
 
 
+class EmployeeOrderBy(Enum):
+    first_name = "first_name"
+    last_name = "last_name"
+    department = "department"
+
+
 class EmployeeSearch(BaseModel):
     """EmployeeSearchOpts contains searching options for employees"""
     id: tp.Optional[str]
@@ -33,3 +41,5 @@ class EmployeeSearch(BaseModel):
     last_name: tp.Optional[str]
     limit: int
     offset: int
+    order_by: EmployeeOrderBy
+    order_direction: OrderDirection
