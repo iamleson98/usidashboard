@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import subprocess
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from models.abnormal_checking import AbnormalChecking
+from dataclasses import dataclass
 
 
 driver_options = Options()
@@ -50,6 +51,12 @@ def change_file_write_permissions(path: str):
         return False
     except Exception:
         return False
+    
+@dataclass
+class CheckOutInfo:
+    station: str
+    check_time: datetime
+
 
 class DataCrawlerWorker(BaseWorker):
     USER_NAME = "PDVIP"
@@ -170,7 +177,7 @@ class DataCrawlerWorker(BaseWorker):
 
             dframe = dframe.sort_values(by=[TIME], ascending=True)
 
-            meet_map = {}
+            meet_map: dict[str, CheckOutInfo] = {}
             checkins_without_checkout_data: list[CheckingEvent] = []
 
             for _, item in dframe.iterrows():
@@ -203,12 +210,12 @@ class DataCrawlerWorker(BaseWorker):
                 )
 
                 if is_checkin:
-                    last_checkout_time = meet_map.get(employee_id, None)
-                    if last_checkout_time is None:
+                    last_checkout_data = meet_map.get(employee_id, None)
+                    if last_checkout_data is None:
                         # meaning there is no last checkout data
                         checkins_without_checkout_data.append(check_evt)
                     else:
-                        gap_time = check_time - last_checkout_time
+                        gap_time = check_time - last_checkout_data.check_time
                         gap_mins = gap_time.total_seconds() / 60
                         if gap_mins > ALLOWED_GAP_MINS:
                             # abnormal
@@ -216,8 +223,10 @@ class DataCrawlerWorker(BaseWorker):
                             abnormal_checking_record = AbnormalChecking(
                                 employee_id=employee_id,
                                 in_time=check_time,
-                                out_time=last_checkout_time,
+                                out_time=last_checkout_data.check_time,
                                 total_mins=gap_mins,
+                                checkin_station=checking_type,
+                                checkout_station=last_checkout_data.station,
                             )
                             self.abnormalRepo.create(abnormal_checking_record)
 
@@ -225,7 +234,7 @@ class DataCrawlerWorker(BaseWorker):
                         del meet_map[employee_id]
                 else:
                     # check out, insert to meet map
-                    meet_map[employee_id] = check_time
+                    meet_map[employee_id] = CheckOutInfo(station=checking_type, check_time=check_time)
 
 
             # done parsing file, begin handling missing data
@@ -242,16 +251,19 @@ class DataCrawlerWorker(BaseWorker):
                             in_time=event.time,
                             out_time=last_checkout.time,
                             total_mins=gap_mins,
+                            checkin_station=checking_type,
+                            checkout_station=last_checkout.station,
                         )
                         self.abnormalRepo.create(abnormal_checking_record)
             
             if len(meet_map) > 0:
                 # meaning some check outs do not have checkin events yet, just save them to database for later reference
-                for (employee_id, checkout_time) in meet_map.items():
+                for (employee_id, checkout_data) in meet_map.items():
                     check_evt = CheckingEvent(
                         employee_id=employee_id,
                         is_checkin=False,
-                        time=checkout_time,
+                        time=checkout_data.check_time,
+                        station=checkout_data.station,
                     )
                     self.checkingEventRepo.create(check_evt)
 

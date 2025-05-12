@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 from api.ws import SocketRouter
+from api.abnormals import AbnormalRouter
 
 
 env = get_environment_variables()
@@ -52,6 +53,7 @@ app.include_router(CheckingEventApiRouter)
 app.include_router(BreakApiRouter)
 app.include_router(SocketRouter)
 app.include_router(JobRouter)
+app.include_router(AbnormalRouter)
 
 @app.get("/")
 def read_root():

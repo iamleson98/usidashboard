@@ -11,6 +11,7 @@ class CheckingEvent(EntityMeta):
     employee_id = sq.Column(sq.String(length=12), sq.ForeignKey("employees.id"))
     is_checkin = sq.Column(sq.Boolean, nullable=True) # 1 means checking in, 0 mean checking out
     time = sq.Column(sq.DateTime, nullable=False)
+    station = sq.Column(sq.String(100), nullable=False)
 
     employee = relationship(
         "Employee",

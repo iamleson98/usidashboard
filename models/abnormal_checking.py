@@ -12,6 +12,8 @@ class AbnormalChecking(EntityMeta):
     in_time = sq.Column(sq.DateTime, nullable=False) # 1 means checking in, 0 mean checking out
     out_time = sq.Column(sq.DateTime, nullable=False)
     total_mins = sq.Column(sq.Integer, nullable=False)
+    checkin_station = sq.Column(sq.String(100), nullable=False)
+    checkout_station = sq.Column(sq.String(100), nullable=False)
 
     employee = relationship(
         "Employee",
