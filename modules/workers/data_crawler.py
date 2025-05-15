@@ -162,8 +162,8 @@ class DataCrawlerWorker(BaseWorker):
         full_file_path = os.path.join(dir_path, file_name + ".xlsx")
 
         if os.path.exists(full_file_path):
-            os.rmdir(dir_path)
             os.remove(full_file_path)
+            os.rmdir(dir_path)
 
     def handle_data(self, file_name: str):
         # wait for file to ready:
