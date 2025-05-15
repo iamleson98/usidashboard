@@ -158,8 +158,11 @@ class DataCrawlerWorker(BaseWorker):
             return
         
     def handle_delete_file(self, file_name: str):
-        full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
+        dir_path = os.path.join(DATA_FOLDER_PATH, file_name)
+        full_file_path = os.path.join(dir_path, file_name + ".xlsx")
+
         if os.path.exists(full_file_path):
+            os.rmdir(dir_path)
             os.remove(full_file_path)
 
     def handle_data(self, file_name: str):
