@@ -1,7 +1,7 @@
 from models.base import EntityMeta
 import sqlalchemy as sq
 from sqlalchemy.orm import relationship
-from dto.abnormal import AbnormalChecking
+from dto.abnormal import AbnormalChecking as AbnormalCheckingDto
 
 
 class AbnormalChecking(EntityMeta):
@@ -23,7 +23,7 @@ class AbnormalChecking(EntityMeta):
     sq.PrimaryKeyConstraint(id)
 
     def normalize(self):
-        return AbnormalChecking(
+        return AbnormalCheckingDto(
             id=self.id,
             employee_id=self.employee_id,
             in_time=self.in_time,

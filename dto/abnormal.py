@@ -1,5 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
+from enum import Enum
+
 
 class AbnormalChecking(BaseModel):
     id: int
@@ -9,3 +11,9 @@ class AbnormalChecking(BaseModel):
     total_mins: int
     checkin_station: str
     checkout_station: str
+
+
+class AbnormalCheckingOrderBy(Enum):
+    in_time = "in_time"
+    out_time = "out_time"
+    total_mins = "total_mins"

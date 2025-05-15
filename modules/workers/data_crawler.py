@@ -14,12 +14,14 @@ from models.employee import Employee
 from datetime import datetime, timedelta
 import subprocess
 from repositories.abnormal_checking import AbnormalCheckingRepo
+from repositories.job import SettingRepo
 from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
+from dto.settings import SettingType, SettingValue
 
 
 driver_options = Options()
-driver_options.add_argument("--headless=new")
+# driver_options.add_argument("--headless=new")
 driver_options.add_argument("--window-size=1200,768")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
@@ -71,7 +73,7 @@ class DataCrawlerWorker(BaseWorker):
         self.checkingEventRepo = CheckoutEventRepo(self.db)
         self.employeeRepo = EmployeeRepo(self.db)
         self.abnormalRepo = AbnormalCheckingRepo(self.db)
-        self._run = True
+        self.settingRepo = SettingRepo(self.db)
 
     def stop(self):
         if self.driver:
@@ -154,6 +156,11 @@ class DataCrawlerWorker(BaseWorker):
         except Exception:
             # already exist, dont raise
             return
+        
+    def handle_delete_file(self, file_name: str):
+        full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
+        if os.path.exists(full_file_path):
+            os.remove(full_file_path)
 
     def handle_data(self, file_name: str):
         # wait for file to ready:
@@ -199,7 +206,9 @@ class DataCrawlerWorker(BaseWorker):
                 if not checking_type:
                     continue
 
-                is_checkin = "face" in f"{checking_type}".lower()
+                checking_type = checking_type.strip().lower()
+
+                is_checkin = "face" in checking_type
 
                 self.__try_insert_employee(item)
 
@@ -207,6 +216,7 @@ class DataCrawlerWorker(BaseWorker):
                     employee_id=employee_id,
                     is_checkin=is_checkin,
                     time=check_time,
+                    station=checking_type,
                 )
 
                 if is_checkin:
@@ -271,7 +281,8 @@ class DataCrawlerWorker(BaseWorker):
             return e
 
     def execute(self):
-        if not self._run:
+        setting = self.settingRepo.get_by_type(SettingType.data_crawler.value)
+        if setting and setting.value == SettingValue.disable_data_crawler.value:
             return
 
         tries = 0
@@ -293,6 +304,7 @@ class DataCrawlerWorker(BaseWorker):
                 continue
 
             self.set_job_success(CRAWLER_JOB_TYPE)
+            self.handle_delete_file(file_name)
             self.stop()
             return
 
@@ -307,10 +319,5 @@ class DataCrawlerWorker(BaseWorker):
         ActionChains(self.driver) \
             .double_click(element_click) \
             .perform()
-        
-    def toggle_status(self, on: bool):
-        """programmatically turn your job on or off"""
-        self._run = on
-
 
 CRAWLER_WORKER = DataCrawlerWorker()

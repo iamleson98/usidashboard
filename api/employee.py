@@ -50,6 +50,6 @@ def create(
     employee: EmployeeSchema,
     svc: EmployeeRepo = Depends(),
 ):
-    if employee.is_valid():
-        return svc.create(Employee.from_dto(employee))
+    if employee.is_valid() is None:
+        return svc.create(Employee.from_dto(employee)).normalize()
     return None
