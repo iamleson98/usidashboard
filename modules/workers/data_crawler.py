@@ -21,7 +21,7 @@ from dto.settings import SettingType, SettingValue
 
 
 driver_options = Options()
-# driver_options.add_argument("--headless=new")
+driver_options.add_argument("--headless=new")
 driver_options.add_argument("--window-size=1200,768")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
