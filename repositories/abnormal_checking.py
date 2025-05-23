@@ -15,7 +15,8 @@ class AbnormalCheckingRepo(BaseRepo):
         start_time: datetime = None, 
         end_time: datetime = None, 
         floor_number: int = 1, 
-        search_query: str = None, 
+        search_query: str = None,
+        department: str = None,
         order_by: AbnormalCheckingOrderBy = AbnormalCheckingOrderBy.in_time,
         order_direction: OrderDirection = OrderDirection.asc,
     ):

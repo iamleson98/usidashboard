@@ -22,9 +22,10 @@ def get_list(
     count_total: bool = False,
     order_by: AbnormalCheckingOrderBy = AbnormalCheckingOrderBy.in_time,
     order_direction: OrderDirection = OrderDirection.asc,
+    department: str = None,
     svc: AbnormalCheckingRepo = Depends(),
 ):
-    abnormal_list = svc.list_by_time(limit, offset, start_time, end_time, floor_number, query, order_by, order_direction)
+    abnormal_list = svc.list_by_time(limit, offset, start_time, end_time, floor_number, query, department, order_by, order_direction)
 
     if not abnormal_list:
         return ListReturnSchema(

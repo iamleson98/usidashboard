@@ -127,16 +127,16 @@ def get_hour_min_from_datetime(dt: datetime) -> time:
 def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
     return (end_time - start_time).total_seconds() / 60
 
-@dataclass
 class Break(object):
     start_time: time
     end_time: time
     depts: list[str]
 
-    @lru_cache
-    @property
-    def allowed_mins(self):
-        return subtract_times(self.end_time, self.start_time)
+    def __init__(self, start_time, end_time, depts):
+        self.start_time = start_time
+        self.end_time = end_time
+        self.depts = depts
+        self.allowed_mins = subtract_times(end_time, start_time)
 
     def check_abnormal(self, actual_time_taken_in_mins: float, full_department: str) -> bool:
         """if return true => abnormal"""
@@ -189,13 +189,13 @@ def calculate_abnormal_result(checkout_time: datetime, checkin_time: datetime, d
     """If returns True => Abnormal, False otherwise"""
     actual_gap_mins = calculate_time_gap_in_mins(checkout_time, checkin_time)
     if actual_gap_mins < ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
-        return False
+        return actual_gap_mins, False
 
-    if actual_gap_mins > ALLOWED_GAP_MINS:
-        break_type = classify_break_type(checkin_time)
-        if break_type is None:
-            return True
-        
+    break_type = classify_break_type(checkin_time)
+    if break_type is None:
+        return actual_gap_mins, True
+    return actual_gap_mins, break_type.check_abnormal(actual_gap_mins, department)
+
     
 @dataclass
 class CheckOutInfo:
@@ -333,7 +333,7 @@ class DataCrawlerWorker(BaseWorker):
             dframe = dframe.sort_values(by=[TIME], ascending=True)
 
             meet_map: dict[str, CheckOutInfo] = {}
-            checkins_without_checkout_data: list[CheckingEvent] = []
+            checkins_without_checkout_data: list[tuple[CheckingEvent, str]] = []
 
             for _, item in dframe.iterrows():
                 # we only process checking records that happend when or after last job success run
@@ -354,6 +354,8 @@ class DataCrawlerWorker(BaseWorker):
                 if not checking_station:
                     continue
 
+                department = item.get(DEPARTMENT)
+
                 checking_station = checking_station.strip().lower()
 
                 is_checkin = "face" in checking_station
@@ -370,13 +372,10 @@ class DataCrawlerWorker(BaseWorker):
                             station=checking_station,
                         )
                         # meaning there is no last checkout data
-                        checkins_without_checkout_data.append(check_evt)
+                        checkins_without_checkout_data.append((check_evt, department, ))
                     else:
-                        gap_time = check_time - last_checkout_data.check_time
-                        gap_mins = gap_time.total_seconds() / 60
-                        if gap_mins > ALLOWED_GAP_MINS and gap_mins < TWELVE_HOURS_MINS:
-                            # abnormal
-                            # insert to database for reporting
+                        gap_mins, is_abnormal = calculate_abnormal_result(last_checkout_data.check_time, check_time, department)
+                        if is_abnormal:
                             abnormal_checking_record = AbnormalChecking(
                                 employee_id=employee_id,
                                 in_time=check_time,
@@ -396,12 +395,11 @@ class DataCrawlerWorker(BaseWorker):
 
             # done parsing file, begin handling missing data
 
-            for event in checkins_without_checkout_data:
+            for (event, department) in checkins_without_checkout_data:
                 # find last check out for each event
                 last_checkout = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
                 if last_checkout:
-                    gap_time = event.time - last_checkout.time
-                    gap_mins = gap_time.total_seconds() / 60
+                    gap_mins, is_abnormal = calculate_abnormal_result(last_checkout.time, event.time, department)
                     if gap_mins > ALLOWED_GAP_MINS and gap_mins < TWELVE_HOURS_MINS:
                         abnormal_checking_record = AbnormalChecking(
                             employee_id=event.employee_id,
