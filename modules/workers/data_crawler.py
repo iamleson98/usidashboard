@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ActionChains
-import time
+from time import sleep
 import os
 from selenium.webdriver.chrome.options import Options
 from repositories.checkout_events import CheckoutEventRepo
@@ -11,14 +11,16 @@ from modules.workers.base_worker import BaseWorker
 from utils.consts import CRAWLER_JOB_TYPE
 from models.checking_event import CheckingEvent
 from models.employee import Employee
-from datetime import datetime, timedelta
-import subprocess
+from datetime import datetime, timedelta, time
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from repositories.job import SettingRepo
 from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
+from functools import lru_cache
 
+# Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
+# I am not responsible for later changes to the official timing schedules of those.
 
 driver_options = Options()
 driver_options.add_argument("--headless=new")
@@ -41,18 +43,159 @@ ACCESS_POINT = "Access Point"
 TIME = "Time"
 DEPARTMENT = "Department"
 ALLOWED_GAP_MINS = 10
+TWELVE_HOURS_MINS = 60 * 12
+ALLOWED_BREAK_MINS = 60 # meal + rest time
+
+ASM = "ASM"
+PD1 = "PD1"
+PD2 = "PD2"
+PD3 = "PD3"
+TE = "TE"
+ME = "ME"
+QMD = "QMD"
+SMT = "SMT"
+GA = "GA"
+IE = "IE"
+SASM = "SASM"
+SWH = "SWH"
+EQ = "EQ"
+FAEE = "FAEE"
+WH = "WH"
+IT = "IT"
+SCM = "SCM"
+OPM = "OPM"
+HR = "HR"
+EHS = "EHS"
+PT = "PT"
+PE = "PE"
+FD = "FD"
+ALL = "ALL"
+    
+
+def get_short_department(full_department: str) -> str:
+    if len(full_department.strip()) == 0:
+        return "UNKNOWN"
+    
+    split = full_department.split(">")
+    if len(split) == 1:
+        return split[0].upper()
+    elif len(split) > 1:
+        return f"{split[-2]}, {split[-1]}".upper()
 
 
-def change_file_write_permissions(path: str):
-    """grant write permission on files on Windows"""
-    cmd = f'icacls "{path}" /grant Everyone:(W)'
-    try:
-        result = subprocess.run(cmd, shell=True, check=True)
-        if result.returncode == 0:
+def calculate_department(full_department: str):
+    dept = get_short_department(full_department).upper()
+
+    if "ASM" in dept:
+        return ASM
+    if "Production Department 1".upper() in dept:
+        return PD1
+    if "Production Department 2".upper() in dept:
+        return PD2
+    if "Production Department 3".upper() in dept:
+        return PD3
+    if "Test Engineering section".upper() in dept:
+        return TE
+    if "back end".upper() in dept or "back end me".upper() in dept:
+        return ME
+    if "QMD" in dept:
+        return QMD
+    if "SMT"in dept:
+        return SMT
+    if "GA" in dept:
+        return GA
+    if "Industrial Engineering".upper() in dept:
+        return IE
+    if "SASM" in dept:
+        return SASM
+    if PE in dept:
+        return PE
+    return None
+    
+def subtract_times(t1: time, t2: time):
+    """total mins for t1-t2"""
+    today = datetime.today()
+    dt1 = datetime.combine(today, t1)
+    dt2 = datetime.combine(today, t2)
+    return (dt1 - dt2).total_seconds() / 60
+
+
+def get_hour_min_from_datetime(dt: datetime) -> time:
+    return time(dt.hour, dt.minute)
+
+
+def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
+    return (end_time - start_time).total_seconds() / 60
+
+@dataclass
+class Break(object):
+    start_time: time
+    end_time: time
+    depts: list[str]
+
+    @lru_cache
+    @property
+    def allowed_mins(self):
+        return subtract_times(self.end_time, self.start_time)
+
+    def check_abnormal(self, actual_time_taken_in_mins: float, full_department: str) -> bool:
+        """if return true => abnormal"""
+
+        if actual_time_taken_in_mins > self.allowed_mins:
             return True
+
+        dept = calculate_department(full_department)
+        if not dept:
+            return True
+        
+        return dept not in self.depts
+
+
+Eleven_Twelve = Break(time(11, 0), time(12, 0), [PD1, SMT, ASM, TE, PD2, QMD])
+ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [PD2, SWH, SASM, EQ, TE, FAEE, ME, WH])
+ElevenFourty_TwelveFourty = Break(time(11, 40), time(12, 40), [PD2, SWH, SASM, SCM, HR, GA, EHS, IE, IT, PE, FD])
+Twelve_TwelveFourtyFive = Break(time(12, 0), time(12, 45), [PD1, PD2, ASM, SMT])
+Sixteen_Seventeen = Break(time(16, 0), time(17, 0), [ALL])
+Seventeen_Eighteen = Break(time(17, 0), time(18, 0), [ALL])
+TwentyThree_TwentyFour = Break(time(23, 0), time(23, 59, 59), [ALL])
+Four_Five = Break(time(4, 0), time(5, 0), [ALL])
+Five_Six = Break(time(5, 0), time(6, 0), [ALL])
+
+
+def classify_break_type(checkout_time: datetime) -> Break | None:
+    out_time = get_hour_min_from_datetime(checkout_time)
+    if out_time >= Four_Five.start_time:
+        return Four_Five
+    if out_time >= Five_Six.start_time:
+        return Five_Six
+    if out_time >= Eleven_Twelve.start_time:
+        return Eleven_Twelve
+    if out_time >= ElevenTwenty_TwelveTwenty.start_time:
+        return ElevenTwenty_TwelveTwenty
+    if out_time >= ElevenFourty_TwelveFourty.start_time:
+        return ElevenFourty_TwelveFourty
+    if out_time >= Twelve_TwelveFourtyFive.start_time:
+        return Twelve_TwelveFourtyFive
+    if out_time >= Sixteen_Seventeen.start_time:
+        return Sixteen_Seventeen
+    if out_time >= Seventeen_Eighteen.start_time:
+        return Seventeen_Eighteen
+    if out_time >= TwentyThree_TwentyFour.start_time:
+        return TwentyThree_TwentyFour
+    return None
+
+
+def calculate_abnormal_result(checkout_time: datetime, checkin_time: datetime, department: str):
+    """If returns True => Abnormal, False otherwise"""
+    actual_gap_mins = calculate_time_gap_in_mins(checkout_time, checkin_time)
+    if actual_gap_mins < ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
         return False
-    except Exception:
-        return False
+
+    if actual_gap_mins > ALLOWED_GAP_MINS:
+        break_type = classify_break_type(checkin_time)
+        if break_type is None:
+            return True
+        
     
 @dataclass
 class CheckOutInfo:
@@ -97,22 +240,22 @@ class DataCrawlerWorker(BaseWorker):
             #click search button
             self.findElement('./html/body/div[5]/div/div/div/div[1]/div[2]/div[3]/div[4]')
             #wait for input to appear
-            time.sleep(3)
+            sleep(3)
 
             #enter identity access search
             self.findElement('./html/body/div[6]/div[1]/div[1]/div[1]/input',['input'],'identity access search')
             #wait for result
-            time.sleep(1)
+            sleep(1)
             #click on identity access search
             self.findElement('./html/body/div[6]/div[1]/div[1]/div[2]/div/div[1]')
             #wait for new page load
-            time.sleep(2)
+            sleep(2)
 
             #choose floor need to double click
             self.doubleclickElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[2]/div[1]/div/div/div[1]/div[3]/ul/div/div/div/ul/li[1]/div/span[2]')
             #choose status type
             self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[3]/div[2]/div/input')
-            # time.sleep(1)
+            # sleep(1)
             self.findElement('./html/body/div[8]/div/div[1]/ul/li[2]/span')
 
             #click search button
@@ -120,14 +263,14 @@ class DataCrawlerWorker(BaseWorker):
             #click export button
             self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[2]/div[1]/button')
             #click csv radio button
-            time.sleep(1)
+            sleep(1)
             self.findElement('.//*[@id="accessControl"]/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[2]/div[1]/label')
 
             #click save button
             self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[3]/button')
 
             # get file name
-            time.sleep(4)
+            sleep(4)
             first_elem = self.driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
             file_name = first_elem.text
 
@@ -144,20 +287,22 @@ class DataCrawlerWorker(BaseWorker):
             visition = item.get(PERSON_VISITOR, "")
             is_visitor = not visition or "person" not in f"{visition}".lower()
 
+            department = get_short_department(item.get(DEPARTMENT))
+
             new_employee = Employee(
                 id = item.get(PERSON_NO),
                 first_name = item.get(FIRST_NAME, ""),
                 last_name = item.get(LAST_NAME),
                 card_no = "",
                 is_visitor = is_visitor,
-                department = item.get(DEPARTMENT),
+                department = department,
             )
             self.employeeRepo.create(new_employee)
         except Exception:
             # already exist, dont raise
             return
         
-    def handle_delete_file(self, file_name: str):
+    def __handle_delete_file(self, file_name: str):
         dir_path = os.path.join(DATA_FOLDER_PATH, file_name)
         full_file_path = os.path.join(dir_path, file_name + ".xlsx")
 
@@ -173,7 +318,7 @@ class DataCrawlerWorker(BaseWorker):
         total_tries = 3
 
         while not file_exist and tries <= total_tries:
-            time.sleep(tries * 2)
+            sleep(tries * 2)
             file_exist = os.path.exists(full_file_path)
             tries += 1
 
@@ -205,32 +350,31 @@ class DataCrawlerWorker(BaseWorker):
                 if not employee_id:
                     continue
 
-                checking_type = item.get(ACCESS_POINT, "")
-                if not checking_type:
+                checking_station = item.get(ACCESS_POINT, "")
+                if not checking_station:
                     continue
 
-                checking_type = checking_type.strip().lower()
+                checking_station = checking_station.strip().lower()
 
-                is_checkin = "face" in checking_type
+                is_checkin = "face" in checking_station
 
                 self.__try_insert_employee(item)
 
-                check_evt = CheckingEvent(
-                    employee_id=employee_id,
-                    is_checkin=is_checkin,
-                    time=check_time,
-                    station=checking_type,
-                )
-
                 if is_checkin:
                     last_checkout_data = meet_map.get(employee_id, None)
-                    if last_checkout_data is None:
+                    if not last_checkout_data:
+                        check_evt = CheckingEvent(
+                            employee_id=employee_id,
+                            is_checkin=True,
+                            time=check_time,
+                            station=checking_station,
+                        )
                         # meaning there is no last checkout data
                         checkins_without_checkout_data.append(check_evt)
                     else:
                         gap_time = check_time - last_checkout_data.check_time
                         gap_mins = gap_time.total_seconds() / 60
-                        if gap_mins > ALLOWED_GAP_MINS:
+                        if gap_mins > ALLOWED_GAP_MINS and gap_mins < TWELVE_HOURS_MINS:
                             # abnormal
                             # insert to database for reporting
                             abnormal_checking_record = AbnormalChecking(
@@ -238,7 +382,7 @@ class DataCrawlerWorker(BaseWorker):
                                 in_time=check_time,
                                 out_time=last_checkout_data.check_time,
                                 total_mins=gap_mins,
-                                checkin_station=checking_type,
+                                checkin_station=checking_station,
                                 checkout_station=last_checkout_data.station,
                             )
                             self.abnormalRepo.create(abnormal_checking_record)
@@ -247,24 +391,24 @@ class DataCrawlerWorker(BaseWorker):
                         del meet_map[employee_id]
                 else:
                     # check out, insert to meet map
-                    meet_map[employee_id] = CheckOutInfo(station=checking_type, check_time=check_time)
+                    meet_map[employee_id] = CheckOutInfo(station=checking_station, check_time=check_time)
 
 
             # done parsing file, begin handling missing data
 
             for event in checkins_without_checkout_data:
                 # find last check out for each event
-                last_checkout: CheckingEvent = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
+                last_checkout = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
                 if last_checkout:
                     gap_time = event.time - last_checkout.time
                     gap_mins = gap_time.total_seconds() / 60
-                    if gap_mins > ALLOWED_GAP_MINS:
+                    if gap_mins > ALLOWED_GAP_MINS and gap_mins < TWELVE_HOURS_MINS:
                         abnormal_checking_record = AbnormalChecking(
                             employee_id=event.employee_id,
                             in_time=event.time,
                             out_time=last_checkout.time,
                             total_mins=gap_mins,
-                            checkin_station=checking_type,
+                            checkin_station=checking_station,
                             checkout_station=last_checkout.station,
                         )
                         self.abnormalRepo.create(abnormal_checking_record)
@@ -307,7 +451,7 @@ class DataCrawlerWorker(BaseWorker):
                 continue
 
             self.set_job_success(CRAWLER_JOB_TYPE)
-            self.handle_delete_file(file_name)
+            self.__handle_delete_file(file_name)
             self.stop()
             return
 

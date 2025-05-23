@@ -23,7 +23,7 @@ class AbnormalChecking(EntityMeta):
     sq.PrimaryKeyConstraint(id)
 
     def normalize(self):
-        return AbnormalCheckingDto(
+        res = AbnormalCheckingDto(
             id=self.id,
             employee_id=self.employee_id,
             in_time=self.in_time,
@@ -32,4 +32,10 @@ class AbnormalChecking(EntityMeta):
             checkin_station=self.checkin_station,
             checkout_station=self.checkout_station,
         )
+        if self.employee:
+            res.first_name = self.employee.first_name
+            res.last_name = self.employee.last_name
+            res.department = self.employee.department
+
+        return res
 

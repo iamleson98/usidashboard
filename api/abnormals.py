@@ -4,6 +4,7 @@ import typing as tp
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from dto.abnormal import AbnormalChecking, AbnormalCheckingOrderBy
 from dto.common import ListReturnSchema, OrderDirection
+from models.abnormal_checking import AbnormalChecking as AbnormalCheckingModel
 
 
 AbnormalRouter = APIRouter(
@@ -31,7 +32,7 @@ def get_list(
             records=[],
             status=200,
         )
-
+    
     result = ListReturnSchema(
         records=map(lambda record: record.normalize(), abnormal_list),
         status=200,
