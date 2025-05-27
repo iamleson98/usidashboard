@@ -11,13 +11,13 @@ from modules.workers.base_worker import BaseWorker
 from utils.consts import CRAWLER_JOB_TYPE
 from models.checking_event import CheckingEvent
 from models.employee import Employee
-from datetime import datetime, timedelta, time
+from datetime import datetime, time
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from repositories.job import SettingRepo
 from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
-from functools import lru_cache
+from dto.employee import ShortDepartment
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -45,72 +45,67 @@ DEPARTMENT = "Department"
 ALLOWED_GAP_MINS = 10
 TWELVE_HOURS_MINS = 60 * 12
 ALLOWED_BREAK_MINS = 60 # meal + rest time
-
-ASM = "ASM"
-PD1 = "PD1"
-PD2 = "PD2"
-PD3 = "PD3"
-TE = "TE"
-ME = "ME"
-QMD = "QMD"
-SMT = "SMT"
-GA = "GA"
-IE = "IE"
-SASM = "SASM"
-SWH = "SWH"
-EQ = "EQ"
-FAEE = "FAEE"
-WH = "WH"
-IT = "IT"
-SCM = "SCM"
-OPM = "OPM"
-HR = "HR"
-EHS = "EHS"
-PT = "PT"
-PE = "PE"
-FD = "FD"
-ALL = "ALL"
     
 
 def get_short_department(full_department: str) -> str:
     if len(full_department.strip()) == 0:
-        return "UNKNOWN"
+        return ShortDepartment.UNKNOWN.value
     
     split = full_department.split(">")
     if len(split) == 1:
-        return split[0].upper()
+        return split[0]
     elif len(split) > 1:
-        return f"{split[-2]}, {split[-1]}".upper()
+        return f"{split[-2]}, {split[-1]}"
 
 
 def calculate_department(full_department: str):
     dept = get_short_department(full_department).upper()
 
     if "ASM" in dept:
-        return ASM
+        return ShortDepartment.ASM
     if "Production Department 1".upper() in dept:
-        return PD1
+        return ShortDepartment.PD1
     if "Production Department 2".upper() in dept:
-        return PD2
+        return ShortDepartment.PD2
+    if "Test Department".upper() in dept:
+        return ShortDepartment.TE
     if "Production Department 3".upper() in dept:
-        return PD3
+        return ShortDepartment.PD3
     if "Test Engineering section".upper() in dept:
-        return TE
+        return ShortDepartment.TE
     if "back end".upper() in dept or "back end me".upper() in dept:
-        return ME
+        return ShortDepartment.ME
+    if "front end".upper() in dept or "front end me".upper() in dept:
+        return ShortDepartment.ME
+    if "ME" in dept:
+        return ShortDepartment.ME
+    if "TE" in dept:
+        return ShortDepartment.TE
     if "QMD" in dept:
-        return QMD
+        return ShortDepartment.QMD
+    if "PT" in dept:
+        return ShortDepartment.PT
     if "SMT"in dept:
-        return SMT
+        return ShortDepartment.SMT
     if "GA" in dept:
-        return GA
+        return ShortDepartment.GA
     if "Industrial Engineering".upper() in dept:
-        return IE
+        return ShortDepartment.IE
     if "SASM" in dept:
-        return SASM
-    if PE in dept:
-        return PE
-    return None
+        return ShortDepartment.SASM
+    if "PE" in dept:
+        return ShortDepartment.PE
+    if "Warehouse Section".upper() in dept:
+        return ShortDepartment.WH
+    if "Equipment Engineering".upper() in dept:
+        return ShortDepartment.EQ
+    if "Test Sub-Section 1".upper() in dept:
+        return ShortDepartment.PD1
+    if "Test Sub-Section 2".upper() in dept:
+        return ShortDepartment.PD2
+    if "Test Sub-Section 3".upper() in dept:
+        return ShortDepartment.PD3
+    return ShortDepartment.UNKNOWN
     
 def subtract_times(t1: time, t2: time):
     """total mins for t1-t2"""
@@ -120,17 +115,13 @@ def subtract_times(t1: time, t2: time):
     return (dt1 - dt2).total_seconds() / 60
 
 
-def get_hour_min_from_datetime(dt: datetime) -> time:
-    return time(dt.hour, dt.minute)
-
-
 def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
     return (end_time - start_time).total_seconds() / 60
 
 class Break(object):
     start_time: time
     end_time: time
-    depts: list[str]
+    depts: list[ShortDepartment]
 
     def __init__(self, start_time, end_time, depts):
         self.start_time = start_time
@@ -143,52 +134,62 @@ class Break(object):
 
         if actual_time_taken_in_mins > self.allowed_mins:
             return True
+        
+        if ShortDepartment.ALL in self.depts:
+            return actual_time_taken_in_mins > self.allowed_mins
 
         dept = calculate_department(full_department)
         if not dept:
             return True
-        
-        return dept not in self.depts
+
+        if dept not in self.depts:
+            return actual_time_taken_in_mins > ALLOWED_GAP_MINS
+
+        return actual_time_taken_in_mins > self.allowed_mins
 
 
-Eleven_Twelve = Break(time(11, 0), time(12, 0), [PD1, SMT, ASM, TE, PD2, QMD])
-ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [PD2, SWH, SASM, EQ, TE, FAEE, ME, WH])
-ElevenFourty_TwelveFourty = Break(time(11, 40), time(12, 40), [PD2, SWH, SASM, SCM, HR, GA, EHS, IE, IT, PE, FD])
-Twelve_TwelveFourtyFive = Break(time(12, 0), time(12, 45), [PD1, PD2, ASM, SMT])
-Sixteen_Seventeen = Break(time(16, 0), time(17, 0), [ALL])
-Seventeen_Eighteen = Break(time(17, 0), time(18, 0), [ALL])
-TwentyThree_TwentyFour = Break(time(23, 0), time(23, 59, 59), [ALL])
-Four_Five = Break(time(4, 0), time(5, 0), [ALL])
-Five_Six = Break(time(5, 0), time(6, 0), [ALL])
+Eleven_Twelve = Break(time(11, 0), time(12, 0), [ShortDepartment.PD1, ShortDepartment.SMT, ShortDepartment.ASM, ShortDepartment.TE, ShortDepartment.PD2, ShortDepartment.QMD])
+ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.EQ, ShortDepartment.TE, ShortDepartment.FAEE, ShortDepartment.ME, ShortDepartment.WH])
+ElevenFourty_TwelveFourty = Break(time(11, 40), time(12, 40), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.SCM, ShortDepartment.HR, ShortDepartment.GA, ShortDepartment.EHS, ShortDepartment.IE, ShortDepartment.IT, ShortDepartment.PE, ShortDepartment.FD])
+Twelve_TwelveFourtyFive = Break(time(12, 0), time(12, 45), [ShortDepartment.PD1, ShortDepartment.PD2, ShortDepartment.ASM, ShortDepartment.SMT])
+Sixteen_Seventeen = Break(time(16, 0), time(17, 0), [ShortDepartment.ALL])
+Seventeen_Eighteen = Break(time(17, 0), time(18, 0), [ShortDepartment.ALL])
+TwentyThree_TwentyFour = Break(time(23, 0), time(23, 59, 59), [ShortDepartment.ALL])
+Four_Five = Break(time(4, 0), time(5, 0), [ShortDepartment.ALL])
+Five_Six = Break(time(5, 0), time(6, 0), [ShortDepartment.ALL])
+Zero_One = Break(time(0, 0), time(1, 0), [ShortDepartment.ALL])
 
 
 def classify_break_type(checkout_time: datetime) -> Break | None:
-    out_time = get_hour_min_from_datetime(checkout_time)
-    if out_time >= Four_Five.start_time:
-        return Four_Five
-    if out_time >= Five_Six.start_time:
-        return Five_Six
-    if out_time >= Eleven_Twelve.start_time:
-        return Eleven_Twelve
-    if out_time >= ElevenTwenty_TwelveTwenty.start_time:
-        return ElevenTwenty_TwelveTwenty
-    if out_time >= ElevenFourty_TwelveFourty.start_time:
-        return ElevenFourty_TwelveFourty
-    if out_time >= Twelve_TwelveFourtyFive.start_time:
-        return Twelve_TwelveFourtyFive
-    if out_time >= Sixteen_Seventeen.start_time:
-        return Sixteen_Seventeen
-    if out_time >= Seventeen_Eighteen.start_time:
-        return Seventeen_Eighteen
-    if out_time >= TwentyThree_TwentyFour.start_time:
+    out_time = time(checkout_time.hour, checkout_time.minute)
+
+    if out_time >= TwentyThree_TwentyFour.start_time and out_time < TwentyThree_TwentyFour.end_time:
         return TwentyThree_TwentyFour
+    if out_time >= Seventeen_Eighteen.start_time and out_time < Seventeen_Eighteen.end_time:
+        return Seventeen_Eighteen
+    if out_time >= Sixteen_Seventeen.start_time and out_time < Sixteen_Seventeen.end_time:
+        return Sixteen_Seventeen
+    if out_time >= Twelve_TwelveFourtyFive.start_time and out_time < Twelve_TwelveFourtyFive.end_time:
+        return Twelve_TwelveFourtyFive
+    if out_time >= ElevenFourty_TwelveFourty.start_time and out_time < ElevenFourty_TwelveFourty.end_time:
+        return ElevenFourty_TwelveFourty
+    if out_time >= ElevenTwenty_TwelveTwenty.start_time and out_time < ElevenTwenty_TwelveTwenty.end_time:
+        return ElevenTwenty_TwelveTwenty
+    if out_time >= Eleven_Twelve.start_time and out_time < Eleven_Twelve.end_time:
+        return Eleven_Twelve
+    if out_time >= Five_Six.start_time and out_time < Five_Six.end_time:
+        return Five_Six
+    if out_time >= Four_Five.start_time and out_time < Four_Five.end_time:
+        return Four_Five
+    if out_time >= Zero_One.start_time and out_time < Zero_One.end_time:
+        return Zero_One
     return None
 
 
 def calculate_abnormal_result(checkout_time: datetime, checkin_time: datetime, department: str):
     """If returns True => Abnormal, False otherwise"""
     actual_gap_mins = calculate_time_gap_in_mins(checkout_time, checkin_time)
-    if actual_gap_mins < ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
+    if actual_gap_mins <= ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
         return actual_gap_mins, False
 
     break_type = classify_break_type(checkin_time)
@@ -287,7 +288,9 @@ class DataCrawlerWorker(BaseWorker):
             visition = item.get(PERSON_VISITOR, "")
             is_visitor = not visition or "person" not in f"{visition}".lower()
 
-            department = get_short_department(item.get(DEPARTMENT))
+            full_dept = item.get(DEPARTMENT)
+            department = get_short_department(full_dept)
+            short_dept = calculate_department(full_dept).value
 
             new_employee = Employee(
                 id = item.get(PERSON_NO),
@@ -296,6 +299,7 @@ class DataCrawlerWorker(BaseWorker):
                 card_no = "",
                 is_visitor = is_visitor,
                 department = department,
+                short_dept = short_dept,
             )
             self.employeeRepo.create(new_employee)
         except Exception:
@@ -400,7 +404,7 @@ class DataCrawlerWorker(BaseWorker):
                 last_checkout = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
                 if last_checkout:
                     gap_mins, is_abnormal = calculate_abnormal_result(last_checkout.time, event.time, department)
-                    if gap_mins > ALLOWED_GAP_MINS and gap_mins < TWELVE_HOURS_MINS:
+                    if is_abnormal:
                         abnormal_checking_record = AbnormalChecking(
                             employee_id=event.employee_id,
                             in_time=event.time,
@@ -410,6 +414,8 @@ class DataCrawlerWorker(BaseWorker):
                             checkout_station=last_checkout.station,
                         )
                         self.abnormalRepo.create(abnormal_checking_record)
+
+                    self.checkingEventRepo.delete(last_checkout)
             
             if len(meet_map) > 0:
                 # meaning some check outs do not have checkin events yet, just save them to database for later reference

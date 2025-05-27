@@ -7,6 +7,34 @@ from dto.common import OrderDirection
 
 EMPLOYEE_ID_REGEX = re.compile(r"^(VN|TW|SH)\d{6}$")
 
+class ShortDepartment(Enum):
+    ASM = "ASM"
+    PD1 = "PD1"
+    PD2 = "PD2"
+    PD3 = "PD3"
+    TE = "TE"
+    ME = "ME"
+    QMD = "QMD"
+    SMT = "SMT"
+    GA = "GA"
+    IE = "IE"
+    SASM = "SASM"
+    SWH = "SWH"
+    EQ = "EQ"
+    FAEE = "FAEE"
+    WH = "WH"
+    IT = "IT"
+    SCM = "SCM"
+    OPM = "OPM"
+    HR = "HR"
+    EHS = "EHS"
+    PT = "PT"
+    PE = "PE"
+    FD = "FD"
+    ALL = "ALL"
+    UNKNOWN = "UNKNOWN"
+
+
 class EmployeeSchema(BaseModel):
     """EmployeeSchema represents the structure of employee object"""
     id: str
@@ -15,6 +43,7 @@ class EmployeeSchema(BaseModel):
     card_no: tp.Optional[str]
     is_visitor: tp.Optional[bool] = False
     department: tp.Optional[str]
+    short_dept: tp.Optional[ShortDepartment]
 
     def is_valid(self) -> tp.Optional[Error]:
         match = EMPLOYEE_ID_REGEX.match(self.id)

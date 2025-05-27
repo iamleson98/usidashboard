@@ -13,6 +13,7 @@ class Employee(EntityMeta):
     card_no = sq.Column(sq.String(length=20), nullable=False)
     is_visitor = sq.Column(sq.Boolean, nullable=True, default=False)
     department = sq.Column(sq.String(500), nullable=False)
+    short_dept = sq.Column(sq.String(20), nullable=True)
 
     checking_events = relationship('CheckingEvent', back_populates='employee')
     abnormals = relationship(
@@ -31,6 +32,7 @@ class Employee(EntityMeta):
             card_no=self.card_no,
             is_visitor=self.is_visitor,
             department=self.department,
+            short_dept=self.short_dept,
         )
     
     @staticmethod
@@ -42,4 +44,5 @@ class Employee(EntityMeta):
             card_no=employee.card_no,
             is_visitor=employee.is_visitor,
             department=employee.department,
+            short_dept=employee.short_dept.value,
         )

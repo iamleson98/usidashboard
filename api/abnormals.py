@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from datetime import datetime
 import typing as tp
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from dto.abnormal import AbnormalChecking, AbnormalCheckingOrderBy
 from dto.common import ListReturnSchema, OrderDirection
-from models.abnormal_checking import AbnormalChecking as AbnormalCheckingModel
-
+from dto.employee import ShortDepartment
 
 AbnormalRouter = APIRouter(
     prefix="/v1/abnormals", tags=["abnormal"]
@@ -22,7 +21,7 @@ def get_list(
     count_total: bool = False,
     order_by: AbnormalCheckingOrderBy = AbnormalCheckingOrderBy.in_time,
     order_direction: OrderDirection = OrderDirection.asc,
-    department: str = None,
+    department: ShortDepartment = None,
     svc: AbnormalCheckingRepo = Depends(),
 ):
     abnormal_list = svc.list_by_time(limit, offset, start_time, end_time, floor_number, query, department, order_by, order_direction)
@@ -42,7 +41,7 @@ def get_list(
     )
 
     if count_total:
-        count = svc.count_by_options(start_time, end_time, floor_number, query)
+        count = svc.count_by_options(start_time, end_time, floor_number, query, department)
         if type(count) is int:
             result.total = count
 
