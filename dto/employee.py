@@ -14,6 +14,7 @@ class ShortDepartment(Enum):
     PD3 = "PD3"
     TE = "TE"
     ME = "ME"
+    SME = "SME"
     QMD = "QMD"
     SMT = "SMT"
     GA = "GA"
@@ -32,6 +33,7 @@ class ShortDepartment(Enum):
     PE = "PE"
     FD = "FD"
     ALL = "ALL"
+    FA = "FA"
     UNKNOWN = "UNKNOWN"
 
 

@@ -18,6 +18,7 @@ from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
+import math
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -44,7 +45,7 @@ TIME = "Time"
 DEPARTMENT = "Department"
 ALLOWED_GAP_MINS = 10
 TWELVE_HOURS_MINS = 60 * 12
-ALLOWED_BREAK_MINS = 60 # meal + rest time
+# ALLOWED_BREAK_MINS = 60 # meal + rest time
     
 
 def get_short_department(full_department: str) -> str:
@@ -61,6 +62,8 @@ def get_short_department(full_department: str) -> str:
 def calculate_department(full_department: str):
     dept = get_short_department(full_department).upper()
 
+    if "SASM" in dept:
+        return ShortDepartment.SASM
     if "ASM" in dept:
         return ShortDepartment.ASM
     if "Production Department 1".upper() in dept:
@@ -77,27 +80,31 @@ def calculate_department(full_department: str):
         return ShortDepartment.ME
     if "front end".upper() in dept or "front end me".upper() in dept:
         return ShortDepartment.ME
+    if "Supporter".upper() in dept:
+        return ShortDepartment.UNKNOWN
     if "ME" in dept:
         return ShortDepartment.ME
+    if "System Assembly Manufacturing Engineer".upper() in dept:
+        return ShortDepartment.SME
     if "TE" in dept:
         return ShortDepartment.TE
-    if "QMD" in dept:
+    if "QMD" in dept or "MQA" in dept:
         return ShortDepartment.QMD
     if "PT" in dept:
         return ShortDepartment.PT
-    if "SMT"in dept:
+    if ShortDepartment.SMT.value in dept:
         return ShortDepartment.SMT
+    if ShortDepartment.FA.value in dept:
+        return ShortDepartment.FA
     if "GA" in dept:
         return ShortDepartment.GA
-    if "Industrial Engineering".upper() in dept:
+    if "Industrial Engineering".upper() in dept or "IE" in dept:
         return ShortDepartment.IE
-    if "SASM" in dept:
-        return ShortDepartment.SASM
     if "PE" in dept:
         return ShortDepartment.PE
     if "Warehouse Section".upper() in dept:
         return ShortDepartment.WH
-    if "Equipment Engineering".upper() in dept:
+    if "Equipment Engineering".upper() in dept or "EQ" in dept:
         return ShortDepartment.EQ
     if "Test Sub-Section 1".upper() in dept:
         return ShortDepartment.PD1
@@ -149,8 +156,8 @@ class Break(object):
 
 
 Eleven_Twelve = Break(time(11, 0), time(12, 0), [ShortDepartment.PD1, ShortDepartment.SMT, ShortDepartment.ASM, ShortDepartment.TE, ShortDepartment.PD2, ShortDepartment.QMD])
-ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.EQ, ShortDepartment.TE, ShortDepartment.FAEE, ShortDepartment.ME, ShortDepartment.WH])
-ElevenFourty_TwelveFourty = Break(time(11, 40), time(12, 40), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.SCM, ShortDepartment.HR, ShortDepartment.GA, ShortDepartment.EHS, ShortDepartment.IE, ShortDepartment.IT, ShortDepartment.PE, ShortDepartment.FD])
+ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.EQ, ShortDepartment.TE, ShortDepartment.FAEE, ShortDepartment.ME, ShortDepartment.WH, ShortDepartment.SME])
+ElevenFourty_TwelveFourty = Break(time(11, 40), time(12, 40), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.SCM, ShortDepartment.HR, ShortDepartment.GA, ShortDepartment.EHS, ShortDepartment.IE, ShortDepartment.IT, ShortDepartment.PE, ShortDepartment.FD, ShortDepartment.FA])
 Twelve_TwelveFourtyFive = Break(time(12, 0), time(12, 45), [ShortDepartment.PD1, ShortDepartment.PD2, ShortDepartment.ASM, ShortDepartment.SMT])
 Sixteen_Seventeen = Break(time(16, 0), time(17, 0), [ShortDepartment.ALL])
 Seventeen_Eighteen = Break(time(17, 0), time(18, 0), [ShortDepartment.ALL])
@@ -189,7 +196,8 @@ def classify_break_type(checkout_time: datetime) -> Break | None:
 def calculate_abnormal_result(checkout_time: datetime, checkin_time: datetime, department: str):
     """If returns True => Abnormal, False otherwise"""
     actual_gap_mins = calculate_time_gap_in_mins(checkout_time, checkin_time)
-    if actual_gap_mins <= ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
+    # if total time out > 10 and < 11, still valid
+    if abs(actual_gap_mins - ALLOWED_GAP_MINS) < 1 or actual_gap_mins >= TWELVE_HOURS_MINS:
         return actual_gap_mins, False
 
     break_type = classify_break_type(checkin_time)
