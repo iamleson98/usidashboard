@@ -9,10 +9,11 @@ class BaseWorker:
         self.db = next(get_db_connection())
         self.jobRepo = JobRepo(self.db)
 
-    def set_job_error(self, job_type: str, reason: str):
-        new_job = Job(job_type=job_type, status=False, reason=reason, execution_at=datetime.now())
+    def set_job_error(self, job_type: str, reason: str, execution_at = datetime.now()):
+        new_job = Job(job_type=job_type, status=False, reason=reason, execution_at=execution_at)
         self.jobRepo.create(new_job)
 
-    def set_job_success(self, job_type: str):
-        new_job = Job(job_type=job_type, status=True, execution_at=datetime.now())
+    def set_job_success(self, job_type: str, execution_at = datetime.now()):
+        time_taken = (datetime.now() - execution_at).total_seconds()
+        new_job = Job(job_type=job_type, status=True, reason=f"time_taken: {time_taken}", execution_at=execution_at)
         self.jobRepo.create(new_job)

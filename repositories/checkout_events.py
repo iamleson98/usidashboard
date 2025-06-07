@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import desc, asc
 
 
-class CheckoutEventRepo(BaseRepo):
+class CheckingEventRepo(BaseRepo):
     def find_by_employee_id(self, employee_id: str, offset: int = 0, limit: int = 100) -> tp.List[CheckingEvent]:
         query = self.db.query(CheckingEvent).\
             filter(CheckingEvent.employee_id == employee_id)
@@ -76,4 +76,7 @@ class CheckoutEventRepo(BaseRepo):
         if len(checking_events):
             return checking_events[0]
         return None
+    
+    def delete_records_before_time(self, time: datetime) -> int:
+        return self.db.query(CheckingEvent).filter(CheckingEvent.time < time).delete()
     

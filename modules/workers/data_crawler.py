@@ -4,7 +4,7 @@ from selenium.webdriver import ActionChains
 from time import sleep
 import os
 from selenium.webdriver.chrome.options import Options
-from repositories.checkout_events import CheckoutEventRepo
+from repositories.checkout_events import CheckingEventRepo
 from repositories.employee import EmployeeRepo
 import pandas as pd
 from modules.workers.base_worker import BaseWorker
@@ -18,7 +18,6 @@ from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
-import math
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -46,7 +45,7 @@ DEPARTMENT = "Department"
 ALLOWED_GAP_MINS = 10
 TWELVE_HOURS_MINS = 60 * 12
 # ALLOWED_BREAK_MINS = 60 # meal + rest time
-    
+
 
 def get_short_department(full_department: str) -> str:
     if len(full_department.strip()) == 0:
@@ -62,6 +61,8 @@ def get_short_department(full_department: str) -> str:
 def calculate_department(full_department: str):
     dept = get_short_department(full_department).upper()
 
+    if "Equipment Engineering".upper() in dept or "EQ" in dept:
+        return ShortDepartment.EQ
     if "SASM" in dept:
         return ShortDepartment.SASM
     if "ASM" in dept:
@@ -84,7 +85,7 @@ def calculate_department(full_department: str):
         return ShortDepartment.UNKNOWN
     if "ME" in dept:
         return ShortDepartment.ME
-    if "System Assembly Manufacturing Engineer".upper() in dept:
+    if "System Assembly Manufacturing Engineer".upper() in dept or "SME" in dept:
         return ShortDepartment.SME
     if "TE" in dept:
         return ShortDepartment.TE
@@ -104,8 +105,6 @@ def calculate_department(full_department: str):
         return ShortDepartment.PE
     if "Warehouse Section".upper() in dept:
         return ShortDepartment.WH
-    if "Equipment Engineering".upper() in dept or "EQ" in dept:
-        return ShortDepartment.EQ
     if "Test Sub-Section 1".upper() in dept:
         return ShortDepartment.PD1
     if "Test Sub-Section 2".upper() in dept:
@@ -126,10 +125,6 @@ def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
     return (end_time - start_time).total_seconds() / 60
 
 class Break(object):
-    start_time: time
-    end_time: time
-    depts: list[ShortDepartment]
-
     def __init__(self, start_time, end_time, depts):
         self.start_time = start_time
         self.end_time = end_time
@@ -197,15 +192,15 @@ def calculate_abnormal_result(checkout_time: datetime, checkin_time: datetime, d
     """If returns True => Abnormal, False otherwise"""
     actual_gap_mins = calculate_time_gap_in_mins(checkout_time, checkin_time)
     # if total time out > 10 and < 11, still valid
-    if abs(actual_gap_mins - ALLOWED_GAP_MINS) < 1 or actual_gap_mins >= TWELVE_HOURS_MINS:
+    if actual_gap_mins < ALLOWED_GAP_MINS or actual_gap_mins >= TWELVE_HOURS_MINS:
         return actual_gap_mins, False
 
-    break_type = classify_break_type(checkin_time)
+    break_type = classify_break_type(checkout_time)
     if break_type is None:
-        return actual_gap_mins, True
+        return actual_gap_mins, actual_gap_mins > ALLOWED_GAP_MINS
     return actual_gap_mins, break_type.check_abnormal(actual_gap_mins, department)
 
-    
+
 @dataclass
 class CheckOutInfo:
     station: str
@@ -222,7 +217,7 @@ class DataCrawlerWorker(BaseWorker):
         self, 
     ):
         super().__init__()
-        self.checkingEventRepo = CheckoutEventRepo(self.db)
+        self.checkingEventRepo = CheckingEventRepo(self.db)
         self.employeeRepo = EmployeeRepo(self.db)
         self.abnormalRepo = AbnormalCheckingRepo(self.db)
         self.settingRepo = SettingRepo(self.db)
@@ -232,51 +227,61 @@ class DataCrawlerWorker(BaseWorker):
             self.driver.quit()
 
     def __crawl_data(self):
+        def find_element(Xpath, actions=[], var=''):
+            element_box = self.driver.find_element(By.XPATH, Xpath)
+            element_box.click()
+            if ("input" in actions):
+                element_box.send_keys(var)
+
+        def double_click_element(Xpath):
+            element_click = self.driver.find_element(By.XPATH, Xpath)
+            ActionChains(self.driver).double_click(element_click).perform()
+        
         try:
             self.driver = webdriver.Chrome(options=driver_options)
             self.driver.get(self.URL)
             self.driver.implicitly_wait(10)
 
             #username input
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],self.USER_NAME)
+            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],self.USER_NAME)
             #password input
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[4]/div/div[1]/input',['input'],self.PASSWORD)
+            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[4]/div/div[1]/input',['input'],self.PASSWORD)
             #press login button
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[5]/div/button')
+            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[5]/div/button')
 
             #click access tab
-            self.findElement('./html/body/div[5]/div/div/div/div[1]/div[2]/div[2]/div/div[3]/div[1]/div/div/div/div[1]')
+            find_element('./html/body/div[5]/div/div/div/div[1]/div[2]/div[2]/div/div[3]/div[1]/div/div/div/div[1]')
             #click search button
-            self.findElement('./html/body/div[5]/div/div/div/div[1]/div[2]/div[3]/div[4]')
+            find_element('./html/body/div[5]/div/div/div/div[1]/div[2]/div[3]/div[4]')
             #wait for input to appear
             sleep(3)
 
             #enter identity access search
-            self.findElement('./html/body/div[6]/div[1]/div[1]/div[1]/input',['input'],'identity access search')
+            find_element('./html/body/div[6]/div[1]/div[1]/div[1]/input',['input'],'identity access search')
             #wait for result
             sleep(1)
             #click on identity access search
-            self.findElement('./html/body/div[6]/div[1]/div[1]/div[2]/div/div[1]')
+            find_element('./html/body/div[6]/div[1]/div[1]/div[2]/div/div[1]')
             #wait for new page load
             sleep(2)
 
             #choose floor need to double click
-            self.doubleclickElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[2]/div[1]/div/div/div[1]/div[3]/ul/div/div/div/ul/li[1]/div/span[2]')
+            double_click_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[2]/div[1]/div/div/div[1]/div[3]/ul/div/div/div/ul/li[1]/div/span[2]')
             #choose status type
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[3]/div[2]/div/input')
+            find_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[3]/div[2]/div/input')
             # sleep(1)
-            self.findElement('./html/body/div[8]/div/div[1]/ul/li[2]/span')
+            find_element('./html/body/div[8]/div/div[1]/ul/li[2]/span')
 
             #click search button
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[3]/button')
+            find_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[3]/button')
             #click export button
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[2]/div[1]/button')
+            find_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[2]/div[1]/button')
             #click csv radio button
             sleep(1)
-            self.findElement('.//*[@id="accessControl"]/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[2]/div[1]/label')
+            find_element('.//*[@id="accessControl"]/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[2]/div[1]/label')
 
             #click save button
-            self.findElement('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[3]/button')
+            find_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[5]/div[2]/div[2]/div/div[3]/button')
 
             # get file name
             sleep(4)
@@ -287,7 +292,7 @@ class DataCrawlerWorker(BaseWorker):
 
             return file_name, None
         except Exception as e:
-            self.stop()
+            self.driver.quit()
             return None, e
 
     def __try_insert_employee(self, item: dict):
@@ -314,7 +319,7 @@ class DataCrawlerWorker(BaseWorker):
             # already exist, dont raise
             return
         
-    def __handle_delete_file(self, file_name: str):
+    def handle_delete_file(self, file_name: str):
         dir_path = os.path.join(DATA_FOLDER_PATH, file_name)
         full_file_path = os.path.join(dir_path, file_name + ".xlsx")
 
@@ -325,14 +330,7 @@ class DataCrawlerWorker(BaseWorker):
     def handle_data(self, file_name: str):
         # wait for file to ready:
         full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
-        tries = 1
         file_exist = os.path.exists(full_file_path)
-        total_tries = 3
-
-        while not file_exist and tries <= total_tries:
-            sleep(tries * 2)
-            file_exist = os.path.exists(full_file_path)
-            tries += 1
 
         if not file_exist:
             return FileNotFoundError(f"the file path {full_file_path} does not exist.")
@@ -436,47 +434,53 @@ class DataCrawlerWorker(BaseWorker):
                     )
                     self.checkingEventRepo.create(check_evt)
 
+            return None
+
         except Exception as e:
             return e
+        
+    def handle_aggregate(self, file_name: str):
+        pass
 
     def execute(self):
+        execution_time = datetime.now()
+
         setting = self.settingRepo.get_by_type(SettingType.data_crawler.value)
         if setting and setting.value == SettingValue.disable_data_crawler.value:
             return
 
-        tries = 0
+        crawl_tries = 0
         total_tries = 3
+        file_name = None
+        crawl_error = None
 
-        while tries < total_tries:
-            file_name, error = self.__crawl_data()
-            if error:
-                reason = f"{error}"
-                self.set_job_error(CRAWLER_JOB_TYPE, reason)
-                tries += 1
+        while crawl_tries < total_tries and not file_name:
+            file_name, crawl_error = self.__crawl_data()
+            if crawl_error:
+                crawl_tries += 1
                 continue
+            break
 
-            error = self.handle_data(file_name)
-            if error:
-                reason = f"{error}"
-                self.set_job_error(CRAWLER_JOB_TYPE, reason)
-                tries += 1
+        if crawl_error:
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{crawl_error}")
+            return
+        
+        data_handle_tries = 0
+        data_handle_error = None
+
+        while data_handle_tries < total_tries:
+            data_handle_error = self.handle_data(file_name)
+            if data_handle_error:
+                data_handle_tries += 1
+                sleep(data_handle_tries * 2)
                 continue
+            break
 
-            self.set_job_success(CRAWLER_JOB_TYPE)
-            self.__handle_delete_file(file_name)
-            self.stop()
+        if data_handle_error:
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{data_handle_error}")
             return
 
-    def findElement(self, Xpath, actions=[], var=''):
-        element_box = self.driver.find_element(By.XPATH, Xpath)
-        element_box.click()
-        if ("input" in actions):
-            element_box.send_keys(var)
-
-    def doubleclickElement(self, Xpath):
-        element_click = self.driver.find_element(By.XPATH, Xpath)
-        ActionChains(self.driver) \
-            .double_click(element_click) \
-            .perform()
+        self.set_job_success(CRAWLER_JOB_TYPE, execution_at=execution_time)
+        self.handle_delete_file(file_name)
 
 CRAWLER_WORKER = DataCrawlerWorker()

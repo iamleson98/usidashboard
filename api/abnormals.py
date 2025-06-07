@@ -5,6 +5,7 @@ from repositories.abnormal_checking import AbnormalCheckingRepo
 from dto.abnormal import AbnormalChecking, AbnormalCheckingOrderBy
 from dto.common import ListReturnSchema, OrderDirection
 from dto.employee import ShortDepartment
+from services.abnormals import AggregationService
 
 AbnormalRouter = APIRouter(
     prefix="/v1/abnormals", tags=["abnormal"]
@@ -46,3 +47,7 @@ def get_list(
             result.total = count
 
     return result
+
+@AbnormalRouter.post("/handle-stray-data-files", response_model=bool)
+async def handle_stray_data_files(svc: AggregationService = Depends()):
+    return await svc.handle_stray_data_files()

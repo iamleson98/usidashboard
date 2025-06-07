@@ -25,6 +25,7 @@ class EnvironmentSettings(BaseSettings):
     AUTHORS: str
     DATA_CRAWLER_INTERVAL_MINS: int
     ALLOWED_ORIGINS: str
+    REDIS_URL: str
 
     class Config:
         env_file = get_env_filename()

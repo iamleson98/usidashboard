@@ -1,4 +1,4 @@
-from repositories.checkout_events import CheckoutEventRepo
+from repositories.checkout_events import CheckingEventRepo
 from fastapi import Depends
 from models.checking_event import CheckingEvent
 import typing as tp
@@ -6,9 +6,9 @@ from services.base import BaseService
 
 
 class CheckingEventService(BaseService):
-    checkoutRepo: CheckoutEventRepo
+    checkoutRepo: CheckingEventRepo
 
-    def __init__(self, checkoutRepo: CheckoutEventRepo = Depends()):
+    def __init__(self, checkoutRepo: CheckingEventRepo = Depends()):
         self.checkoutRepo = checkoutRepo
         super().__init__()
 
