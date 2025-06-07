@@ -5,7 +5,9 @@ from time import sleep
 import os
 from selenium.webdriver.chrome.options import Options
 from repositories.checkout_events import CheckingEventRepo
+from repositories.aggregation import AggregationRepo
 from repositories.employee import EmployeeRepo
+from models.aggregations import Aggregation, DATE_FORMAT
 import pandas as pd
 from modules.workers.base_worker import BaseWorker
 from utils.consts import CRAWLER_JOB_TYPE
@@ -18,6 +20,7 @@ from models.abnormal_checking import AbnormalChecking
 from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
+from dto.aggregation import AttendaceRecord
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -221,6 +224,7 @@ class DataCrawlerWorker(BaseWorker):
         self.employeeRepo = EmployeeRepo(self.db)
         self.abnormalRepo = AbnormalCheckingRepo(self.db)
         self.settingRepo = SettingRepo(self.db)
+        self.aggregateRepo = AggregationRepo(self.db)
 
     def stop(self):
         if self.driver:
@@ -328,7 +332,7 @@ class DataCrawlerWorker(BaseWorker):
             os.rmdir(dir_path)
 
     def handle_data(self, file_name: str):
-        # wait for file to ready:
+        # STEP 1) READ FILE
         full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
         file_exist = os.path.exists(full_file_path)
 
@@ -340,8 +344,7 @@ class DataCrawlerWorker(BaseWorker):
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
             latest_success_job = self.jobRepo.get_last_job(only_success=True)
 
-            dframe = dframe.sort_values(by=[TIME], ascending=True)
-
+            # dframe = dframe.sort_values(by=[TIME], ascending=True)
             meet_map: dict[str, CheckOutInfo] = {}
             checkins_without_checkout_data: list[tuple[CheckingEvent, str]] = []
 
@@ -354,6 +357,7 @@ class DataCrawlerWorker(BaseWorker):
 
                 check_time = datetime.strptime(check_time.strip(), "%Y-%m-%d %H:%M:%S")
                 if latest_success_job and latest_success_job.execution_at > check_time:
+                    # skip items that are already processed
                     continue
 
                 employee_id = item.get(PERSON_NO, None)
@@ -373,6 +377,7 @@ class DataCrawlerWorker(BaseWorker):
                 self.__try_insert_employee(item)
 
                 if is_checkin:
+
                     last_checkout_data = meet_map.get(employee_id, None)
                     if not last_checkout_data:
                         check_evt = CheckingEvent(
@@ -402,9 +407,7 @@ class DataCrawlerWorker(BaseWorker):
                     # check out, insert to meet map
                     meet_map[employee_id] = CheckOutInfo(station=checking_station, check_time=check_time)
 
-
-            # done parsing file, begin handling missing data
-
+            # STEP 3) done parsing file, begin handling checkins without checkout data
             for (event, department) in checkins_without_checkout_data:
                 # find last check out for each event
                 last_checkout = self.checkingEventRepo.find_last_checking_event_by_employee_id(event.employee_id, check_in=False)
@@ -423,8 +426,8 @@ class DataCrawlerWorker(BaseWorker):
 
                     self.checkingEventRepo.delete(last_checkout)
             
+            # STEP 4) If there are some checkouts wihout checking data yet, save them to db for later reference
             if len(meet_map) > 0:
-                # meaning some check outs do not have checkin events yet, just save them to database for later reference
                 for (employee_id, checkout_data) in meet_map.items():
                     check_evt = CheckingEvent(
                         employee_id=employee_id,
@@ -440,15 +443,59 @@ class DataCrawlerWorker(BaseWorker):
             return e
         
     def handle_aggregate(self, file_name: str):
-        pass
+        full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
+        file_exist = os.path.exists(full_file_path)
+
+        if not file_exist:
+            return FileNotFoundError(f"the file path {full_file_path} does not exist.")
+
+        # STEP 1) FETCH EXISTING AGGREGATION RECORD FROM DB
+        aggregation = self.aggregateRepo.get_one()
+        if aggregation is None:
+            return Exception("could not find aggregation record")
+
+        normalized_aggrs = aggregation.normalize()
+
+        new_aggregation = AttendaceRecord(
+            time=datetime.now().strftime(DATE_FORMAT),
+            live_count=0,
+        )
+
+        try:
+            # skip first 7 rows since those data is not needed
+            dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
+
+            for _, item in dframe.iterrows():
+                checking_station = item.get(ACCESS_POINT, "")
+                if not checking_station:
+                    continue
+
+                checking_station = checking_station.strip().lower()
+
+                if "face" in checking_station:
+                    new_aggregation.live_count += 1 # ADD 1 unit to live count
+                else:
+                    new_aggregation.live_count -= 1
+
+            # STEP 5) SAVE new aggregation data, we only keep the latest 10 items
+            normalized_aggrs.live_attendances.append(new_aggregation)
+            while len(normalized_aggrs.live_attendances) > 10:
+                normalized_aggrs.live_attendances.pop(0)
+
+            self.aggregateRepo.update(normalized_aggrs.id, Aggregation.from_schema(normalized_aggrs))
+
+        except Exception as e:
+            return e
 
     def execute(self):
         execution_time = datetime.now()
 
+        # check if setting alow run
         setting = self.settingRepo.get_by_type(SettingType.data_crawler.value)
         if setting and setting.value == SettingValue.disable_data_crawler.value:
             return
 
+        # crawl data job
         crawl_tries = 0
         total_tries = 3
         file_name = None
@@ -465,6 +512,7 @@ class DataCrawlerWorker(BaseWorker):
             self.set_job_error(CRAWLER_JOB_TYPE, f"{crawl_error}")
             return
         
+        # handlecheck abnormals job
         data_handle_tries = 0
         data_handle_error = None
 
@@ -478,6 +526,22 @@ class DataCrawlerWorker(BaseWorker):
 
         if data_handle_error:
             self.set_job_error(CRAWLER_JOB_TYPE, f"{data_handle_error}")
+            return
+        
+        # aggregatetion job
+        aggregate_error = None
+        aggregate_tries = 0
+
+        while aggregate_tries < total_tries:
+            aggregate_error = self.handle_aggregate(file_name)
+            if aggregate_error:
+                aggregate_tries += 1
+                sleep(aggregate_tries * 2)
+                continue
+            break
+
+        if aggregate_error:
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{aggregate_error}")
             return
 
         self.set_job_success(CRAWLER_JOB_TYPE, execution_at=execution_time)
