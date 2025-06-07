@@ -456,28 +456,18 @@ class DataCrawlerWorker(BaseWorker):
 
         normalized_aggrs = aggregation.normalize()
 
-        new_aggregation = AttendaceRecord(
-            time=datetime.now().strftime(DATE_FORMAT),
-            live_count=0,
-        )
-
         try:
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
 
-            for _, item in dframe.iterrows():
-                checking_station = item.get(ACCESS_POINT, "")
-                if not checking_station:
-                    continue
-
-                checking_station = checking_station.strip().lower()
-
-                if "face" in checking_station:
-                    new_aggregation.live_count += 1 # ADD 1 unit to live count
-                else:
-                    new_aggregation.live_count -= 1
+            checkins = dframe.loc[dframe[ACCESS_POINT].str.lower().str.find("face") >= 0].shape[0]
+            checkouts = dframe.loc[dframe[ACCESS_POINT].str.lower().str.find("face") == -1].shape[0]
 
             # STEP 5) SAVE new aggregation data, we only keep the latest 10 items
+            new_aggregation = AttendaceRecord(
+                time=datetime.now().strftime(DATE_FORMAT),
+                live_count=abs(checkins-checkouts),
+            )
             normalized_aggrs.live_attendances.append(new_aggregation)
             while len(normalized_aggrs.live_attendances) > 10:
                 normalized_aggrs.live_attendances.pop(0)

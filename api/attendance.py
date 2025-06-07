@@ -27,17 +27,16 @@ async def search_checking_events(
 
 @CheckingEventApiRouter.websocket("/live-attendances")
 async def get_aggregations_data(socket: WebSocket, svc: AggregationRepo = Depends()):
-    closed = False
     await socket.accept()
+    res: Aggregation = svc.get_one()
+    await socket.send_json(res.normalize().model_dump_json())
+
     try:
         while True:
-            await asyncio.sleep(5)
-            res: Aggregation = svc.get_by_id(1, Aggregation)
-            if not closed:
-                await socket.send_json(res.normalize().model_dump_json())
-            # await socket.send_json({'lol': 1})
+            await asyncio.sleep(300)
+            res: Aggregation = svc.get_one()
+            await socket.send_json(res.normalize().model_dump_json())
     except WebSocketDisconnect:
-        closed = True
         await socket.close()
 
     # return res.normalize()
