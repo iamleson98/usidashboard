@@ -15,10 +15,7 @@ RUN pnpm install && pnpm build
 FROM python:3.11-slim
 
 # Set working directory
-WORKDIR /app
-
-# build fe
-# RUN cd fe && 
+WORKDIR /
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -34,14 +31,27 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY /api /api
+COPY /configs /configs
+COPY /db /db
+COPY /dto /dto
+COPY /metadata /metadata
+COPY /models /models
+COPY /modules /modules
+COPY /repositories /repositories
+COPY /services /services
+COPY /utils /utils
+COPY main.py /main.py
+COPY __init__.py /__init__.py
+COPY .env.dev /.env.dev
+COPY alembic.ini /alembic.ini
 
 # copy fe build
-COPY --from=frontend-builder /app/fe/dist ./app/static
+COPY --from=frontend-builder /app/fe/dist /static
 
 # Expose the port FastAPI will run on
 EXPOSE 8000
 
 # Run the application
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8000"]
+CMD ["uvicorn", "main:app", "--env-file", ".env.dev", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
 
