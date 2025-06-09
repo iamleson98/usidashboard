@@ -1,16 +1,11 @@
 from functools import lru_cache
 import os
 from pydantic_settings import BaseSettings
-import sys
 
 @lru_cache
 def get_env_filename():
     runtime_env = os.getenv("ENV")
-    if not runtime_env:
-        # print(sys.argv)
-        if "--dev" in sys.argv:
-            runtime_env = "dev"
-    return f".env.{runtime_env}" if runtime_env else ".env"
+    return f".env.dev"
 
 
 class EnvironmentSettings(BaseSettings):
@@ -23,7 +18,7 @@ class EnvironmentSettings(BaseSettings):
     DB_USERNAME: str
     DEBUG_MODE: bool
     AUTHORS: str
-    DATA_CRAWLER_INTERVAL_MINS: int
+    DATA_CRAWLER_INTERVAL_SECS: int
     ALLOWED_ORIGINS: str
     REDIS_URL: str
 

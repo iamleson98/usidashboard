@@ -11,6 +11,8 @@
                 "--reload",
                 "--env-file",
                 ".env.dev",
+                "--workers",
+                "4",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"

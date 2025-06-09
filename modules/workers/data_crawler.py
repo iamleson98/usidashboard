@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
+from models.aggregations import DATE_FORMAT
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -64,6 +65,8 @@ def get_short_department(full_department: str) -> str:
 def calculate_department(full_department: str):
     dept = get_short_department(full_department).upper()
 
+    if "QMD" in dept or "MQA" in dept:
+        return ShortDepartment.QMD
     if "Equipment Engineering".upper() in dept or "EQ" in dept:
         return ShortDepartment.EQ
     if "SASM" in dept:
@@ -92,8 +95,6 @@ def calculate_department(full_department: str):
         return ShortDepartment.SME
     if "TE" in dept:
         return ShortDepartment.TE
-    if "QMD" in dept or "MQA" in dept:
-        return ShortDepartment.QMD
     if "PT" in dept:
         return ShortDepartment.PT
     if ShortDepartment.SMT.value in dept:
@@ -151,7 +152,18 @@ class Break(object):
             return actual_time_taken_in_mins > ALLOWED_GAP_MINS
 
         return actual_time_taken_in_mins > self.allowed_mins
+    
 
+def handle_parse_time_from_data_file_name(file_name: str):
+    """Identity Access Search_2025_06_09_15_21_36_762"""
+    split_name = file_name.split("_")
+    numbers = filter(lambda item: item.isdigit(), split_name)
+    numbers = list(numbers)
+    if len(numbers) != 7:
+        return None
+    
+    return datetime.strptime(f"{numbers[0]}-{numbers[1]}-{numbers[2]} {numbers[3]}:{numbers[4]}:{numbers[5]}", DATE_FORMAT)
+    
 
 Eleven_Twelve = Break(time(11, 0), time(12, 0), [ShortDepartment.PD1, ShortDepartment.SMT, ShortDepartment.ASM, ShortDepartment.TE, ShortDepartment.PD2, ShortDepartment.QMD])
 ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.EQ, ShortDepartment.TE, ShortDepartment.FAEE, ShortDepartment.ME, ShortDepartment.WH, ShortDepartment.SME])
@@ -448,6 +460,9 @@ class DataCrawlerWorker(BaseWorker):
 
         if not file_exist:
             return FileNotFoundError(f"the file path {full_file_path} does not exist.")
+        
+        # the time must be the time this file is exported, this ensure the integrity of result data
+        crawl_time: datetime = handle_parse_time_from_data_file_name(file_name)
 
         # STEP 1) FETCH EXISTING AGGREGATION RECORD FROM DB
         aggregation = self.aggregateRepo.get_one()
@@ -465,14 +480,17 @@ class DataCrawlerWorker(BaseWorker):
 
             # STEP 5) SAVE new aggregation data, we only keep the latest 10 items
             new_aggregation = AttendaceRecord(
-                time=datetime.now().strftime(DATE_FORMAT),
-                live_count=abs(checkins-checkouts),
+                time=crawl_time.strftime(DATE_FORMAT),
+                live_count=checkins-checkouts,
             )
             normalized_aggrs.live_attendances.append(new_aggregation)
+            normalized_aggrs.updated_at = datetime.now()
             while len(normalized_aggrs.live_attendances) > 10:
                 normalized_aggrs.live_attendances.pop(0)
 
             self.aggregateRepo.update(normalized_aggrs.id, Aggregation.from_schema(normalized_aggrs))
+
+            return None
 
         except Exception as e:
             return e
@@ -499,7 +517,7 @@ class DataCrawlerWorker(BaseWorker):
             break
 
         if crawl_error:
-            self.set_job_error(CRAWLER_JOB_TYPE, f"{crawl_error}")
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{crawl_error}", execution_at=execution_time)
             return
         
         # handlecheck abnormals job
@@ -515,7 +533,7 @@ class DataCrawlerWorker(BaseWorker):
             break
 
         if data_handle_error:
-            self.set_job_error(CRAWLER_JOB_TYPE, f"{data_handle_error}")
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{data_handle_error}", execution_at=execution_time)
             return
         
         # aggregatetion job
@@ -531,7 +549,7 @@ class DataCrawlerWorker(BaseWorker):
             break
 
         if aggregate_error:
-            self.set_job_error(CRAWLER_JOB_TYPE, f"{aggregate_error}")
+            self.set_job_error(CRAWLER_JOB_TYPE, f"{aggregate_error}", execution_at=execution_time)
             return
 
         self.set_job_success(CRAWLER_JOB_TYPE, execution_at=execution_time)

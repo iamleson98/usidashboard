@@ -17,27 +17,26 @@ from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 from api.ws import SocketRouter
 from api.abnormals import AbnormalRouter
-from redis import asyncio as aioredis
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
+# from redis import asyncio as aioredis
+# from fastapi_cache import FastAPICache
+# from fastapi_cache.backends.redis import RedisBackend
 
 
 env = get_environment_variables()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     # checking data crawler job
-    scheduler.add_job(CRAWLER_WORKER.execute, IntervalTrigger(seconds=300))
+    scheduler.add_job(CRAWLER_WORKER.execute, IntervalTrigger(seconds=env.DATA_CRAWLER_INTERVAL_SECS))
     # clear stale checking events job
     scheduler.add_job(STALE_CHECKING_EVENT_CLEANER.execute, CronTrigger(hour=0, minute=0))
     scheduler.start()
     init()
 
     # redis
-    redis = aioredis.from_url(env.REDIS_URL)
-    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+    # redis = aioredis.from_url(env.REDIS_URL)
+    # FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
     yield
     scheduler.shutdown()
 

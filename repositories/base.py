@@ -3,6 +3,7 @@ from fastapi import Depends
 from configs.db import get_db_connection
 from typing import TypeVar, Generic, Optional
 import typing as tp
+from sqlalchemy import update
 
 # Type definition for Model
 M = TypeVar("M")
@@ -48,6 +49,7 @@ class BaseRepo(Generic[M, K]):
             instance.id = id
             self.db.merge(instance)
             self.db.commit()
+            self.db.expire_all()
             return instance
         except Exception:
             self.db.rollback()

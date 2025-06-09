@@ -49,6 +49,8 @@ COPY alembic.ini /alembic.ini
 # copy fe build
 COPY --from=frontend-builder /app/fe/dist /static
 
+ENV ENV="DEV"
+
 # Expose the port FastAPI will run on
 EXPOSE 8000
 

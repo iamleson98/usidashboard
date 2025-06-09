@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 import typing as tp
 from dto.checking_events import CheckingEventSchema
-from dto.aggregation import AggregationSchema
+# from dto.aggregation import AggregationSchema
 from repositories.checkout_events import CheckingEventRepo
 from repositories.aggregation import AggregationRepo
 from models.aggregations import Aggregation
 import asyncio
+from configs.db import get_db_connection
 
 CheckingEventApiRouter = APIRouter(
     prefix="/v1/checking-events", tags=["checking_events"]
@@ -28,15 +29,15 @@ async def search_checking_events(
 @CheckingEventApiRouter.websocket("/live-attendances")
 async def get_aggregations_data(socket: WebSocket, svc: AggregationRepo = Depends()):
     await socket.accept()
-    res: Aggregation = svc.get_one()
-    await socket.send_json(res.normalize().model_dump_json())
+    initial: Aggregation = svc.get_one()
+    await socket.send_json(initial.normalize().model_dump_json())
+
+    closed = False
 
     try:
-        while True:
-            await asyncio.sleep(300)
-            res: Aggregation = svc.get_one()
+        while not closed:
+            await asyncio.sleep(10)
+            res: Aggregation = AggregationRepo(next(get_db_connection())).get_one()
             await socket.send_json(res.normalize().model_dump_json())
     except WebSocketDisconnect:
-        await socket.close()
-
-    # return res.normalize()
+        closed = True
