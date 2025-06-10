@@ -99,7 +99,7 @@ def calculate_department(full_department: str):
         return ShortDepartment.PT
     if ShortDepartment.SMT.value in dept:
         return ShortDepartment.SMT
-    if ShortDepartment.FA.value in dept:
+    if ShortDepartment.FA.value in dept or "Factory Affair".upper() in dept:
         return ShortDepartment.FA
     if "GA" in dept:
         return ShortDepartment.GA
@@ -349,14 +349,14 @@ class DataCrawlerWorker(BaseWorker):
         file_exist = os.path.exists(full_file_path)
 
         if not file_exist:
-            return FileNotFoundError(f"the file path {full_file_path} does not exist.")
+            return FileNotFoundError(f"handle_data: the file path {full_file_path} does not exist.")
 
         try:
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
             latest_success_job = self.jobRepo.get_last_job(only_success=True)
 
-            # dframe = dframe.sort_values(by=[TIME], ascending=True)
+            dframe = dframe.sort_values(by=[TIME], ascending=True)
             meet_map: dict[str, CheckOutInfo] = {}
             checkins_without_checkout_data: list[tuple[CheckingEvent, str]] = []
 
@@ -459,7 +459,7 @@ class DataCrawlerWorker(BaseWorker):
         file_exist = os.path.exists(full_file_path)
 
         if not file_exist:
-            return FileNotFoundError(f"the file path {full_file_path} does not exist.")
+            return FileNotFoundError(f"handle_aggregate: the file path {full_file_path} does not exist.")
         
         # the time must be the time this file is exported, this ensure the integrity of result data
         crawl_time: datetime = handle_parse_time_from_data_file_name(file_name)
@@ -475,16 +475,23 @@ class DataCrawlerWorker(BaseWorker):
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
 
-            checkins = dframe.loc[dframe[ACCESS_POINT].str.lower().str.find("face") >= 0].shape[0]
-            checkouts = dframe.loc[dframe[ACCESS_POINT].str.lower().str.find("face") == -1].shape[0]
+            FLOOR_NUMBERS = ['1', '2', '3', '4']
 
             # STEP 5) SAVE new aggregation data, we only keep the latest 10 items
             new_aggregation = AttendaceRecord(
                 time=crawl_time.strftime(DATE_FORMAT),
-                live_count=checkins-checkouts,
+                live_count={},
             )
+
+            for floor_no in FLOOR_NUMBERS:
+                checkins = dframe.loc[(dframe[ACCESS_POINT].str.startswith(floor_no)) & (dframe[ACCESS_POINT].str.lower().str.find("face") >= 0)].shape[0]
+                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.startswith(floor_no)) & (dframe[ACCESS_POINT].str.lower().str.find("face") == -1)].shape[0]
+
+                new_aggregation.live_count[f"floor {floor_no}"] = checkins - checkouts
+            
             normalized_aggrs.live_attendances.append(new_aggregation)
-            normalized_aggrs.updated_at = datetime.now()
+            normalized_aggrs.updated_at = crawl_time
+
             while len(normalized_aggrs.live_attendances) > 10:
                 normalized_aggrs.live_attendances.pop(0)
 
@@ -528,7 +535,7 @@ class DataCrawlerWorker(BaseWorker):
             data_handle_error = self.handle_data(file_name)
             if data_handle_error:
                 data_handle_tries += 1
-                sleep(data_handle_tries * 2)
+                sleep(data_handle_tries * 3)
                 continue
             break
 

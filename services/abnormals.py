@@ -27,10 +27,12 @@ class AggregationService(BaseService):
             entity_files = os.listdir(entity_path)
             stray_data_files.extend(map(lambda item: os.path.splitext(item)[0], entity_files))
 
-        results = [(CRAWLER_WORKER.handle_data(file), CRAWLER_WORKER.handle_aggregate(file)) for file in stray_data_files]
+        # results = [(CRAWLER_WORKER.handle_data(file), CRAWLER_WORKER.handle_aggregate(file)) for file in stray_data_files]
+        for file in stray_data_files:
+            err1 = CRAWLER_WORKER.handle_data(file)
+            err2 = CRAWLER_WORKER.handle_aggregate(file)
 
-        for idx, errors in enumerate(results):
-            if not any(errors):
-                CRAWLER_WORKER.handle_delete_file(stray_data_files[idx])
-        
+            if not err1 and not err2:
+                CRAWLER_WORKER.handle_delete_file(file)
+
         return True

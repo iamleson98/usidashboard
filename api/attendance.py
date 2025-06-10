@@ -37,7 +37,10 @@ async def get_aggregations_data(socket: WebSocket, svc: AggregationRepo = Depend
     try:
         while not closed:
             await asyncio.sleep(10)
-            res: Aggregation = AggregationRepo(next(get_db_connection())).get_one()
+            ses = next(get_db_connection())
+            res: Aggregation = AggregationRepo(ses).get_one()
+            ses.connection().close()
+            ses.close()
             await socket.send_json(res.normalize().model_dump_json())
     except WebSocketDisconnect:
         closed = True

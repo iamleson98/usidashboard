@@ -2,6 +2,7 @@ from models.base import EntityMeta
 import sqlalchemy as sa
 from dto.aggregation import AggregationSchema, AttendaceRecord
 from datetime import datetime
+import json
 
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -14,31 +15,20 @@ class Aggregation(EntityMeta):
     live_attendances = sa.Column(sa.JSON)
 
     def normalize(self) -> AggregationSchema:
-        res = AggregationSchema(id=self.id, updated_at=self.updated_at, live_attendances=[])
-        time_strs: list[str] = self.live_attendances.keys()
-        sorted_time_strs = sorted(time_strs, key=lambda item: datetime.strptime(item, DATE_FORMAT))
-        
-        for item in sorted_time_strs:
-            actual_time = datetime.strptime(item, DATE_FORMAT)
-            record = AttendaceRecord(
-                time=actual_time,
-                live_count=self.live_attendances[item],
-            )
-            res.live_attendances.append(record)
-
+        live_attendances = json.loads(self.live_attendances)
+        live_attendances = map(lambda item: json.loads(item), live_attendances)
+        res = AggregationSchema(id=self.id, updated_at=self.updated_at, live_attendances=list(live_attendances))
         return res
     
     @staticmethod
     def from_schema(schema: AggregationSchema):
+        records = map(lambda item: item.model_dump_json(), schema.live_attendances)
         res = Aggregation(
             id=schema.id,
             updated_at=schema.updated_at,
-            
+            live_attendances=json.dumps(list(records)),
         )
-        data = {}
-        for item in schema.live_attendances:
-            data[item.time.strftime(DATE_FORMAT)] = item.live_count
-        res.live_attendances = data
-
+        # data = {}
+        # for item in schema.live_attendances:
         return res
 

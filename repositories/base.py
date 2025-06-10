@@ -49,9 +49,9 @@ class BaseRepo(Generic[M, K]):
             instance.id = id
             self.db.merge(instance)
             self.db.commit()
-            self.db.expire_all()
+            # self.db.expire_all()
             return instance
-        except Exception:
+        except Exception as e:
             self.db.rollback()
             return None
 
