@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
-from models.aggregations import DATE_FORMAT
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -495,6 +494,8 @@ class DataCrawlerWorker(BaseWorker):
             while len(normalized_aggrs.live_attendances) > 10:
                 normalized_aggrs.live_attendances.pop(0)
 
+            normalized_aggrs.live_attendances.sort(key=lambda item: datetime.strptime(item.time, DATE_FORMAT))
+
             self.aggregateRepo.update(normalized_aggrs.id, Aggregation.from_schema(normalized_aggrs))
 
             return None
@@ -562,4 +563,7 @@ class DataCrawlerWorker(BaseWorker):
         self.set_job_success(CRAWLER_JOB_TYPE, execution_at=execution_time)
         self.handle_delete_file(file_name)
 
-CRAWLER_WORKER = DataCrawlerWorker()
+
+def execute_data_crawler():
+    crawler = DataCrawlerWorker()
+    crawler.execute()

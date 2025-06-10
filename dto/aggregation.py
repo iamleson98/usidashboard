@@ -30,7 +30,7 @@ from datetime import datetime
 
 
 class AttendaceRecord(BaseModel):
-    time: datetime
+    time: str
     live_count: dict[str, int]
 
 

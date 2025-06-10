@@ -17,6 +17,7 @@ class Aggregation(EntityMeta):
     def normalize(self) -> AggregationSchema:
         live_attendances = json.loads(self.live_attendances)
         live_attendances = map(lambda item: json.loads(item), live_attendances)
+        # live_attendances = map(lambda item: datetime.fromisoformat(item["time"]), live_attendances)
         res = AggregationSchema(id=self.id, updated_at=self.updated_at, live_attendances=list(live_attendances))
         return res
     

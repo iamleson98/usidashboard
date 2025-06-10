@@ -2,7 +2,7 @@ from fastapi import Depends
 # import typing as tp
 from services.base import BaseService
 from repositories.aggregation import AggregationRepo
-from modules.workers.data_crawler import DATA_FOLDER_PATH, CRAWLER_WORKER
+from modules.workers.data_crawler import DATA_FOLDER_PATH, DataCrawlerWorker
 import os
 # import asyncio
 
@@ -27,12 +27,13 @@ class AggregationService(BaseService):
             entity_files = os.listdir(entity_path)
             stray_data_files.extend(map(lambda item: os.path.splitext(item)[0], entity_files))
 
-        # results = [(CRAWLER_WORKER.handle_data(file), CRAWLER_WORKER.handle_aggregate(file)) for file in stray_data_files]
+        worker = DataCrawlerWorker()
+
         for file in stray_data_files:
-            err1 = CRAWLER_WORKER.handle_data(file)
-            err2 = CRAWLER_WORKER.handle_aggregate(file)
+            err1 = worker.handle_data(file)
+            err2 = worker.handle_aggregate(file)
 
             if not err1 and not err2:
-                CRAWLER_WORKER.handle_delete_file(file)
+                worker.handle_delete_file(file)
 
         return True
