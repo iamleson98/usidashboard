@@ -240,26 +240,22 @@ class DataCrawlerWorker(BaseWorker):
         self.settingRepo = SettingRepo(self.db)
         self.aggregateRepo = AggregationRepo(self.db)
 
-    def stop(self):
-        if self.driver:
-            self.driver.quit()
-
     def __crawl_data(self):
+        driver = webdriver.Chrome(options=driver_options)
+        driver.get(self.URL)
+        driver.implicitly_wait(10)
+
         def find_element(Xpath, actions=[], var=''):
-            element_box = self.driver.find_element(By.XPATH, Xpath)
+            element_box = driver.find_element(By.XPATH, Xpath)
             element_box.click()
             if ("input" in actions):
                 element_box.send_keys(var)
 
         def double_click_element(Xpath):
-            element_click = self.driver.find_element(By.XPATH, Xpath)
-            ActionChains(self.driver).double_click(element_click).perform()
-        
-        try:
-            self.driver = webdriver.Chrome(options=driver_options)
-            self.driver.get(self.URL)
-            self.driver.implicitly_wait(10)
+            element_click = driver.find_element(By.XPATH, Xpath)
+            ActionChains(driver).double_click(element_click).perform()
 
+        try:
             #username input
             find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],self.USER_NAME)
             #password input
@@ -303,14 +299,14 @@ class DataCrawlerWorker(BaseWorker):
 
             # get file name
             sleep(4)
-            first_elem = self.driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
+            first_elem = driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
             file_name = first_elem.text
 
-            self.driver.quit()
+            driver.quit()
 
             return file_name, None
         except Exception as e:
-            self.driver.quit()
+            driver.quit()
             return None, e
 
     def __try_insert_employee(self, item: dict):
