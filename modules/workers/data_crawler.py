@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
+import math
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -68,10 +69,6 @@ def calculate_department(full_department: str):
         return ShortDepartment.QMD
     if "Equipment Engineering".upper() in dept or "EQ" in dept:
         return ShortDepartment.EQ
-    if "SASM" in dept:
-        return ShortDepartment.SASM
-    if "ASM" in dept:
-        return ShortDepartment.ASM
     if "Production Department 1".upper() in dept:
         return ShortDepartment.PD1
     if "Production Department 2".upper() in dept:
@@ -80,6 +77,10 @@ def calculate_department(full_department: str):
         return ShortDepartment.TE
     if "Production Department 3".upper() in dept:
         return ShortDepartment.PD3
+    if "SASM" in dept:
+        return ShortDepartment.SASM
+    if "ASM" in dept:
+        return ShortDepartment.ASM
     if "Test Engineering section".upper() in dept:
         return ShortDepartment.TE
     if "back end".upper() in dept or "back end me".upper() in dept:
@@ -125,7 +126,9 @@ def subtract_times(t1: time, t2: time):
 
 
 def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
-    return (end_time - start_time).total_seconds() / 60
+    secs = (end_time - start_time).total_seconds() / 60
+    return math.floor(secs)
+
 
 class Break(object):
     def __init__(self, start_time, end_time, depts):
