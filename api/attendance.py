@@ -2,16 +2,9 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 import typing as tp
 from dto.checking_events import CheckingEventSchema
 from repositories.checkout_events import CheckingEventRepo
-# from repositories.aggregation import AggregationRepo
 from services.abnormals import AggregationService
-# from repositories.abnormal_checking import AbnormalCheckingRepo
-# from models.aggregations import Aggregation
 import asyncio
-# from configs.db import get_db_connection
 from configs.env import env
-# from dto.common import OrderDirection
-# from repositories.job import JobRepo
-# import json
 
 
 CheckingEventApiRouter = APIRouter(

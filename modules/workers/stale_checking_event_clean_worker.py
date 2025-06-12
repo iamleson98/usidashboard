@@ -24,4 +24,6 @@ class StaleCheckingEventsWorker(BaseWorker):
             self.set_job_error(self.name, f"{e}")
 
 
-STALE_CHECKING_EVENT_CLEANER = StaleCheckingEventsWorker()
+def clear_stale_events():
+    wk = StaleCheckingEventsWorker()
+    wk.execute()

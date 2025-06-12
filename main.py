@@ -4,12 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from api.employee import EmployeeRouter
 from api.attendance import CheckingEventApiRouter
-from api.breaking import BreakApiRouter
 from api.job import JobRouter
 from configs.env import env
 from metadata.tags import Tags
 from modules.workers.data_crawler import execute_data_crawler
-from modules.workers.stale_checking_event_clean_worker import STALE_CHECKING_EVENT_CLEANER
+from modules.workers.stale_checking_event_clean_worker import clear_stale_events
 from models.base import init
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -25,7 +24,7 @@ async def lifespan(app: FastAPI):
     # checking data crawler job
     scheduler.add_job(execute_data_crawler, IntervalTrigger(seconds=env.DATA_CRAWLER_INTERVAL_SECS))
     # clear stale checking events job
-    scheduler.add_job(STALE_CHECKING_EVENT_CLEANER.execute, CronTrigger(hour=0, minute=0))
+    scheduler.add_job(clear_stale_events, CronTrigger(hour=0, minute=0))
     scheduler.start()
     init()
     yield
@@ -51,7 +50,6 @@ app.add_middleware(
 # Add routers
 app.include_router(EmployeeRouter)
 app.include_router(CheckingEventApiRouter)
-app.include_router(BreakApiRouter)
 app.include_router(SocketRouter)
 app.include_router(JobRouter)
 app.include_router(AbnormalRouter)
