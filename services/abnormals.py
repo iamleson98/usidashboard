@@ -1,17 +1,22 @@
 from fastapi import Depends
-# import typing as tp
 from services.base import BaseService
 from repositories.aggregation import AggregationRepo
 from modules.workers.data_crawler import DATA_FOLDER_PATH, DataCrawlerWorker
 import os
-# import asyncio
+from repositories.abnormal_checking import AbnormalCheckingRepo
+from dto.aggregation import AggregationResponse
+from dto.common import OrderDirection
+from repositories.job import JobRepo
+from configs.db import get_db_connection
 
 
 class AggregationService(BaseService):
     repo: AggregationRepo
 
-    def __init__(self, repo: AggregationRepo = Depends()):
+    def __init__(self, repo: AggregationRepo = Depends(), abnormalRepo: AbnormalCheckingRepo = Depends(), jobRepo: JobRepo = Depends()):
         self.repo = repo
+        self.abnormalRepo = abnormalRepo
+        self.jobRepo = jobRepo
         super().__init__()
 
     async def handle_stray_data_files(self):
@@ -37,3 +42,25 @@ class AggregationService(BaseService):
                 worker.handle_delete_file(file)
 
         return True
+
+    async def get_aggregation(self) -> AggregationResponse:
+        session = next(get_db_connection())
+
+        repo = AggregationRepo(session)
+        abnormalRepo = AbnormalCheckingRepo(session)
+        abnormal_cases = abnormalRepo.list_by_time(limit=50, order_direction=OrderDirection.desc)
+
+        aggregation = repo.get_one()
+
+        if not aggregation:
+            session.close()
+            return AggregationResponse(aggregations=None, abnormal_cases=[])
+        
+        abnormal_cases = list(map(lambda item: item.normalize(), abnormal_cases))
+
+        session.close()
+
+        return AggregationResponse(
+            aggregations=aggregation.normalize(),
+            abnormal_cases=abnormal_cases,
+        )

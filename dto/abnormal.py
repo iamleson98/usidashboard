@@ -15,6 +15,7 @@ class AbnormalChecking(BaseModel):
     first_name: tp.Optional[str] = None
     last_name: tp.Optional[str] = None
     department: tp.Optional[str] = None
+    floor: int
 
 
 class AbnormalCheckingOrderBy(Enum):

@@ -19,8 +19,12 @@ class EnvironmentSettings(BaseSettings):
     DEBUG_MODE: bool
     AUTHORS: str
     DATA_CRAWLER_INTERVAL_SECS: int
+    REAL_TIME_REPORT_INTERVAL_SECS: int
     ALLOWED_ORIGINS: str
     REDIS_URL: str
+    HIK_VISION_USER_NAME: str
+    HIK_VISION_PASSWORD: str
+    HIK_VISION_URL: str
 
     class Config:
         env_file = get_env_filename()
@@ -30,3 +34,5 @@ class EnvironmentSettings(BaseSettings):
 def get_environment_variables():
     return EnvironmentSettings()
 
+
+env = get_environment_variables()

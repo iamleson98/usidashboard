@@ -22,6 +22,7 @@ from dto.settings import SettingType, SettingValue
 from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
 import math
+from configs.env import env
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -29,6 +30,7 @@ import math
 driver_options = Options()
 driver_options.add_argument("--headless=new")
 driver_options.add_argument("--window-size=1200,768")
+driver_options.add_argument("--log-level=3")
 
 # The Hk web requires a client tool to be installed before we can connect and export checking data
 # When we export, that tool save to folder "C:\Users\Public\HCWebControlService" on windows
@@ -130,6 +132,13 @@ def calculate_time_gap_in_mins(start_time: datetime, end_time: datetime):
     return math.floor(secs)
 
 
+def get_floor_from_check_point_name(name: str) -> int:
+    split = name.split('-')
+    if len(split) != 4:
+        return 5
+
+    return int(split[2][0])
+
 class Break(object):
     def __init__(self, start_time, end_time, depts):
         self.start_time = start_time
@@ -225,9 +234,6 @@ class CheckOutInfo:
 
 
 class DataCrawlerWorker(BaseWorker):
-    USER_NAME = "PDVIP"
-    PASSWORD = "USIVIP@2025"
-    URL = "http://10.53.232.80/#/"
     SHEET_NAME = "Sheet1"
 
     def __init__(
@@ -242,7 +248,7 @@ class DataCrawlerWorker(BaseWorker):
 
     def __crawl_data(self):
         driver = webdriver.Chrome(options=driver_options)
-        driver.get(self.URL)
+        driver.get(env.HIK_VISION_URL)
         driver.implicitly_wait(10)
 
         def find_element(Xpath, actions=[], var=''):
@@ -257,9 +263,9 @@ class DataCrawlerWorker(BaseWorker):
 
         try:
             #username input
-            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],self.USER_NAME)
+            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[3]/div/div/span[1]/input',['input'],env.HIK_VISION_USER_NAME)
             #password input
-            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[4]/div/div[1]/input',['input'],self.PASSWORD)
+            find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[4]/div/div[1]/input',['input'],env.HIK_VISION_PASSWORD)
             #press login button
             find_element('./html/body/div[5]/div/div/div/div[2]/div[3]/form/div[5]/div/button')
 
@@ -280,7 +286,7 @@ class DataCrawlerWorker(BaseWorker):
             sleep(2)
 
             #choose floor need to double click
-            double_click_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[2]/div[1]/div/div/div[1]/div[3]/ul/div/div/div/ul/li[1]/div/span[2]')
+            double_click_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[2]/div[1]/div/div/div[1]/div[3]/ul/div/div/div/li/div/span[2]')
             #choose status type
             find_element('./html/body/div[5]/div/div/div/div[2]/div/div[2]/div/div/div/div[2]/div[2]/div/div[4]/div[1]/div[1]/div[2]/div/div/div[3]/div[2]/div/input')
             # sleep(1)
@@ -301,6 +307,8 @@ class DataCrawlerWorker(BaseWorker):
             sleep(4)
             first_elem = driver.find_element(By.XPATH, './/*[@id="body"]/div[9]/div[1]/div/div[1]/p[1]')
             file_name = first_elem.text
+
+            sleep(4)
 
             driver.quit()
 
@@ -382,12 +390,9 @@ class DataCrawlerWorker(BaseWorker):
 
                 checking_station = checking_station.strip().lower()
 
-                is_checkin = "face" in checking_station
-
                 self.__try_insert_employee(item)
 
-                if is_checkin:
-
+                if "face" in checking_station:
                     last_checkout_data = meet_map.get(employee_id, None)
                     if not last_checkout_data:
                         check_evt = CheckingEvent(
@@ -397,8 +402,11 @@ class DataCrawlerWorker(BaseWorker):
                             station=checking_station,
                         )
                         # meaning there is no last checkout data
-                        checkins_without_checkout_data.append((check_evt, department, ))
+                        checkins_without_checkout_data.append((check_evt, department,))
                     else:
+                        # remove data from map
+                        del meet_map[employee_id]
+
                         gap_mins, is_abnormal = calculate_abnormal_result(last_checkout_data.check_time, check_time, department)
                         if is_abnormal:
                             abnormal_checking_record = AbnormalChecking(
@@ -408,11 +416,10 @@ class DataCrawlerWorker(BaseWorker):
                                 total_mins=gap_mins,
                                 checkin_station=checking_station,
                                 checkout_station=last_checkout_data.station,
+                                floor=get_floor_from_check_point_name(checking_station),
                             )
                             self.abnormalRepo.create(abnormal_checking_record)
 
-                        # remove data from map
-                        del meet_map[employee_id]
                 else:
                     # check out, insert to meet map
                     meet_map[employee_id] = CheckOutInfo(station=checking_station, check_time=check_time)
@@ -429,8 +436,9 @@ class DataCrawlerWorker(BaseWorker):
                             in_time=event.time,
                             out_time=last_checkout.time,
                             total_mins=gap_mins,
-                            checkin_station=checking_station,
+                            checkin_station=event.station,
                             checkout_station=last_checkout.station,
+                            floor=get_floor_from_check_point_name(event.station),
                         )
                         self.abnormalRepo.create(abnormal_checking_record)
 
@@ -482,8 +490,8 @@ class DataCrawlerWorker(BaseWorker):
             )
 
             for floor_no in FLOOR_NUMBERS:
-                checkins = dframe.loc[(dframe[ACCESS_POINT].str.startswith(floor_no)) & (dframe[ACCESS_POINT].str.lower().str.find("face") >= 0)].shape[0]
-                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.startswith(floor_no)) & (dframe[ACCESS_POINT].str.lower().str.find("face") == -1)].shape[0]
+                checkins = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") >= 0) & (dframe[ACCESS_POINT].str.get(7) == floor_no)].shape[0]
+                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") == -1) & (dframe[ACCESS_POINT].str.get(6) == floor_no)].shape[0]
 
                 new_aggregation.live_count[f"floor {floor_no}"] = checkins - checkouts
             

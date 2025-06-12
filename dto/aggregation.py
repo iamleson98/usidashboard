@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 # import typing as tp
 from datetime import datetime
+from dto.abnormal import AbnormalChecking
 
 """
     {
@@ -38,3 +39,8 @@ class AggregationSchema(BaseModel):
     id: int
     updated_at: datetime
     live_attendances: list[AttendaceRecord]
+
+
+class AggregationResponse(BaseModel):
+    aggregations: AggregationSchema | None
+    abnormal_cases: list[AbnormalChecking]

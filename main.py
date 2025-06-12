@@ -6,7 +6,7 @@ from api.employee import EmployeeRouter
 from api.attendance import CheckingEventApiRouter
 from api.breaking import BreakApiRouter
 from api.job import JobRouter
-from configs.env import get_environment_variables
+from configs.env import env
 from metadata.tags import Tags
 from modules.workers.data_crawler import execute_data_crawler
 from modules.workers.stale_checking_event_clean_worker import STALE_CHECKING_EVENT_CLEANER
@@ -18,8 +18,6 @@ from contextlib import asynccontextmanager
 from api.ws import SocketRouter
 from api.abnormals import AbnormalRouter
 
-
-env = get_environment_variables()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

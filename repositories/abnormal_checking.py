@@ -59,7 +59,7 @@ class AbnormalCheckingRepo(BaseRepo):
         if end_time:
             query = query.filter(AbnormalChecking.in_time <= end_time)
         if floor_number:
-            query = query.filter(AbnormalChecking.checkin_station.ilike(f"{floor_number}%"))
+            query = query.filter(AbnormalChecking.floor == floor_number)
         if search_query or department:
             query = query.join(Employee, Employee.id == AbnormalChecking.employee_id, isouter=False)
 

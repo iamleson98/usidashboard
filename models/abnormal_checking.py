@@ -14,6 +14,7 @@ class AbnormalChecking(EntityMeta):
     total_mins = sq.Column(sq.Integer, nullable=False)
     checkin_station = sq.Column(sq.String(100), nullable=False)
     checkout_station = sq.Column(sq.String(100), nullable=False)
+    floor = sq.Column(sq.SmallInteger, nullable=False)
 
     employee = relationship(
         "Employee",
@@ -31,6 +32,7 @@ class AbnormalChecking(EntityMeta):
             total_mins=self.total_mins,
             checkin_station=self.checkin_station,
             checkout_station=self.checkout_station,
+            floor=self.floor,
         )
         if self.employee:
             res.first_name = self.employee.first_name

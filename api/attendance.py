@@ -1,12 +1,18 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 import typing as tp
 from dto.checking_events import CheckingEventSchema
-# from dto.aggregation import AggregationSchema
 from repositories.checkout_events import CheckingEventRepo
-from repositories.aggregation import AggregationRepo
-from models.aggregations import Aggregation
+# from repositories.aggregation import AggregationRepo
+from services.abnormals import AggregationService
+# from repositories.abnormal_checking import AbnormalCheckingRepo
+# from models.aggregations import Aggregation
 import asyncio
-from configs.db import get_db_connection
+# from configs.db import get_db_connection
+from configs.env import env
+# from dto.common import OrderDirection
+# from repositories.job import JobRepo
+# import json
+
 
 CheckingEventApiRouter = APIRouter(
     prefix="/v1/checking-events", tags=["checking_events"]
@@ -27,20 +33,19 @@ async def search_checking_events(
 
 
 @CheckingEventApiRouter.websocket("/live-attendances")
-async def get_aggregations_data(socket: WebSocket, svc: AggregationRepo = Depends()):
+async def get_aggregations_data(socket: WebSocket, svc: AggregationService = Depends()):
     await socket.accept()
-    initial: Aggregation = svc.get_one()
-    await socket.send_json(initial.normalize().model_dump_json())
+    initial = await svc.get_aggregation()
+    await socket.send_json(initial.model_dump_json())
 
     closed = False
 
     try:
         while not closed:
-            await asyncio.sleep(10)
-            ses = next(get_db_connection())
-            res: Aggregation = AggregationRepo(ses).get_one()
-            ses.connection().close()
-            ses.close()
-            await socket.send_json(res.normalize().model_dump_json())
+            await asyncio.sleep(env.REAL_TIME_REPORT_INTERVAL_SECS)
+            
+            aggregation_data = await svc.get_aggregation()
+
+            await socket.send_json(aggregation_data.model_dump_json())
     except WebSocketDisconnect:
         closed = True
