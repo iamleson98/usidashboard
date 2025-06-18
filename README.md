@@ -52,4 +52,4 @@ For basic needs, we need a means to alter (upgrade) and redo (downgrade). That i
 
 `alembic downgrade <down_revision_code>`
 
-
+ docker compose run --rm --build fastapi_app alembic upgrade head

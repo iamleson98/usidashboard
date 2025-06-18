@@ -1,0 +1,61 @@
+# version: '3.8'
+
+services:
+  db:
+    image: mariadb:noble
+    container_name: mariadb_container
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD?error}
+      - MYSQL_DATABASE=${DB_NAME?error}
+      - MYSQL_USER=${DB_USERNAME?error}
+      - MYSQL_PASSWORD=${DB_PASSWORD?error}
+    ports:
+      - "3306:3306"
+    networks:
+      - backend_network
+    volumes:
+      - db_volume:/var/lib/mysql
+
+  fastapi_app:
+    build: .
+    container_name: fastapi_container
+    env_file:
+      - .env
+    depends_on:
+      - db
+    # environment:
+    #   - AUTHORS=${AUTHORS?error}
+    #   - DB_USERNAME=${DB_USERNAME?error}
+    #   - DB_PASSWORD=${DB_PASSWORD?error}
+    #   - DB_PORT=${DB_PORT?error}
+    #   - DB_NAME=${DB_NAME?error}
+    #   - API_VERSION=${API_VERSION?error}
+    #   - APP_NAME=${APP_NAME?error}
+    #   - DB_HOST=${DB_HOST?error}
+    #   - DEBUG_MODE=${DEBUG_MODE?error}
+    #   - DATA_CRAWLER_INTERVAL_SECS=${DATA_CRAWLER_INTERVAL_SECS?error}
+    #   - REAL_TIME_REPORT_INTERVAL_SECS=${REAL_TIME_REPORT_INTERVAL_SECS?error}
+    #   - ALLOWED_ORIGINS=${ALLOWED_ORIGINS?error}
+    #   - REDIS_URL=${REDIS_URL?error}
+    #   - HIK_VISION_USER_NAME=${HIK_VISION_USER_NAME?error}
+    #   - HIK_VISION_PASSWORD=${HIK_VISION_PASSWORD?error}
+    #   - HIK_VISION_URL=${HIK_VISION_URL?error}
+    networks:
+      - backend_network
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # Ensures Alembic has access to your migration scripts
+    # command: >
+    #   sh -c "alembic upgrade head -x 'sqlalchemy.url=mysql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}'"
+
+volumes:
+  db_volume:
+    driver: local
+
+networks:
+  backend_network:
+    driver: bridge

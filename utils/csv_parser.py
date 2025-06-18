@@ -1,10 +1,6 @@
 import os
 import pandas as pd
 
-# PARENT_DIR = os.path.dirname(os.path.dirname(__file__))
-# DATA_FOLDER_NAME = "data"
-# DATA_DIR = os.path.join(PARENT_DIR, DATA_FOLDER_NAME)
-
 
 class CheckingEventParser(object):
     def __init__(self, file_path: str):
