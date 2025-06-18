@@ -56,7 +56,7 @@ TWELVE_HOURS_MINS = 60 * 12
 def get_short_department(full_department: str) -> str:
     if len(full_department.strip()) == 0:
         return ShortDepartment.UNKNOWN.value
-    
+
     split = full_department.split(">")
     if len(split) == 1:
         return split[0]
@@ -118,7 +118,7 @@ def calculate_department(full_department: str):
     if "Test Sub-Section 3".upper() in dept:
         return ShortDepartment.PD3
     return ShortDepartment.UNKNOWN
-    
+
 def subtract_times(t1: time, t2: time):
     """total mins for t1-t2"""
     today = datetime.today()
@@ -151,7 +151,7 @@ class Break(object):
 
         if actual_time_taken_in_mins > self.allowed_mins:
             return True
-        
+
         if ShortDepartment.ALL in self.depts:
             return actual_time_taken_in_mins > self.allowed_mins
 
@@ -163,7 +163,7 @@ class Break(object):
             return actual_time_taken_in_mins > ALLOWED_GAP_MINS
 
         return actual_time_taken_in_mins > self.allowed_mins
-    
+
 
 def handle_parse_time_from_data_file_name(file_name: str):
     """Identity Access Search_2025_06_09_15_21_36_762"""
@@ -172,9 +172,9 @@ def handle_parse_time_from_data_file_name(file_name: str):
     numbers = list(numbers)
     if len(numbers) != 7:
         return None
-    
+
     return datetime.strptime(f"{numbers[0]}-{numbers[1]}-{numbers[2]} {numbers[3]}:{numbers[4]}:{numbers[5]}", DATE_FORMAT)
-    
+
 
 Eleven_Twelve = Break(time(11, 0), time(12, 0), [ShortDepartment.PD1, ShortDepartment.SMT, ShortDepartment.ASM, ShortDepartment.TE, ShortDepartment.PD2, ShortDepartment.QMD])
 ElevenTwenty_TwelveTwenty = Break(time(11, 20), time(12, 20), [ShortDepartment.PD2, ShortDepartment.SWH, ShortDepartment.SASM, ShortDepartment.EQ, ShortDepartment.TE, ShortDepartment.FAEE, ShortDepartment.ME, ShortDepartment.WH, ShortDepartment.SME])
@@ -340,7 +340,7 @@ class DataCrawlerWorker(BaseWorker):
         except Exception:
             # already exist, dont raise
             return
-        
+
     def handle_delete_file(self, file_name: str):
         dir_path = os.path.join(DATA_FOLDER_PATH, file_name)
         full_file_path = os.path.join(dir_path, file_name + ".xlsx")
@@ -443,7 +443,7 @@ class DataCrawlerWorker(BaseWorker):
                         self.abnormalRepo.create(abnormal_checking_record)
 
                     self.checkingEventRepo.delete(last_checkout)
-            
+
             # STEP 4) If there are some checkouts wihout checking data yet, save them to db for later reference
             if len(meet_map) > 0:
                 for (employee_id, checkout_data) in meet_map.items():
@@ -459,7 +459,7 @@ class DataCrawlerWorker(BaseWorker):
 
         except Exception as e:
             return e
-        
+
     def handle_aggregate(self, file_name: str):
         full_file_path = os.path.join(DATA_FOLDER_PATH, file_name, file_name + ".xlsx")
         file_exist = os.path.exists(full_file_path)
@@ -534,7 +534,7 @@ class DataCrawlerWorker(BaseWorker):
         if crawl_error:
             self.set_job_error(CRAWLER_JOB_TYPE, f"{crawl_error}", execution_at=execution_time)
             return
-        
+
         # handlecheck abnormals job
         data_handle_tries = 0
         data_handle_error = None
@@ -550,7 +550,7 @@ class DataCrawlerWorker(BaseWorker):
         if data_handle_error:
             self.set_job_error(CRAWLER_JOB_TYPE, f"{data_handle_error}", execution_at=execution_time)
             return
-        
+
         # aggregatetion job
         aggregate_error = None
         aggregate_tries = 0

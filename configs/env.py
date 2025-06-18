@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings
 @lru_cache
 def get_env_filename():
     runtime_env = os.getenv("ENV")
-    return f".env.dev"
+    if not runtime_env or runtime_env == "dev":
+        return ".env.dev"
+    return ".env"
 
 
 class EnvironmentSettings(BaseSettings):
@@ -25,6 +27,7 @@ class EnvironmentSettings(BaseSettings):
     HIK_VISION_USER_NAME: str
     HIK_VISION_PASSWORD: str
     HIK_VISION_URL: str
+    ENV: str
 
     class Config:
         env_file = get_env_filename()
