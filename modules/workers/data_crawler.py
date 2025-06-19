@@ -23,6 +23,7 @@ from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
 import math
 from configs.env import env
+import polars as pl
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -490,8 +491,8 @@ class DataCrawlerWorker(BaseWorker):
             )
 
             for floor_no in FLOOR_NUMBERS:
-                checkins = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") >= 0) & (dframe[ACCESS_POINT].str.get(7) == floor_no)].shape[0]
-                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") == -1) & (dframe[ACCESS_POINT].str.get(6) == floor_no)].shape[0]
+                checkins = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") >= 0) & (dframe[ACCESS_POINT].str.strip().str.get(7) == floor_no)].shape[0]
+                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") == -1) & (dframe[ACCESS_POINT].str.strip().str.get(6) == floor_no)].shape[0]
 
                 new_aggregation.live_count[f"floor {floor_no}"] = checkins - checkouts
             
