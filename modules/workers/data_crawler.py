@@ -324,7 +324,7 @@ class DataCrawlerWorker(BaseWorker):
             visition = item.get(PERSON_VISITOR, "")
             is_visitor = not visition or "person" not in f"{visition}".lower()
 
-            full_dept = item.get(DEPARTMENT)
+            full_dept: str = item.get(DEPARTMENT, "")
             department = get_short_department(full_dept)
             short_dept = calculate_department(full_dept).value
 
@@ -387,7 +387,7 @@ class DataCrawlerWorker(BaseWorker):
                 if not checking_station:
                     continue
 
-                department = item.get(DEPARTMENT)
+                department = item.get(DEPARTMENT, "")
 
                 checking_station = checking_station.strip().lower()
 

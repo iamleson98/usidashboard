@@ -10,14 +10,14 @@ from dto.employee import ShortDepartment
 
 class AbnormalCheckingRepo(BaseRepo):
     def list_by_time(
-        self, 
-        limit: int = 100, 
-        offset: int = 0, 
-        start_time: datetime = None, 
-        end_time: datetime = None, 
-        floor_number: int = 1, 
-        search_query: str = None,
-        department: ShortDepartment = None,
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        floor_number: int = 1,
+        search_query: str | None = None,
+        department: ShortDepartment | None = None,
         order_by: AbnormalCheckingOrderBy = AbnormalCheckingOrderBy.in_time,
         order_direction: OrderDirection = OrderDirection.asc,
     ):
@@ -38,17 +38,17 @@ class AbnormalCheckingRepo(BaseRepo):
 
         return query.all()
 
-    def list_by_employee_id(self, employee_id: str, limit: int = 100, offset: int = 0, start_time: datetime = None, end_time: datetime = None):
+    def list_by_employee_id(self, employee_id: str, limit: int = 100, offset: int = 0, start_time: datetime | None = None, end_time: datetime | None = None):
         results_by_time = self.list_by_time(limit, offset, start_time, end_time)
         return filter(lambda item: item.employee_id == employee_id, results_by_time)
     
     def __general_query_builder(
             self,
-            start_time: datetime = None, 
-            end_time: datetime = None, 
+            start_time: datetime | None = None, 
+            end_time: datetime | None = None, 
             floor_number: int = 1, 
-            search_query: str = None,
-            department: ShortDepartment = None,
+            search_query: str | None = None,
+            department: ShortDepartment | None = None,
             order_by: AbnormalCheckingOrderBy = AbnormalCheckingOrderBy.in_time,
             order_direction: OrderDirection = OrderDirection.asc,
     ):
@@ -76,5 +76,5 @@ class AbnormalCheckingRepo(BaseRepo):
 
         return query.order_by(order_direction.to_orm_operator(order_by.value))
 
-    def count_by_options(self, start_time: datetime = None, end_time: datetime = None, floor_number: int = None, search_query: str = None, department: str = None):
+    def count_by_options(self, start_time: datetime | None = None, end_time: datetime | None = None, floor_number: int | None = None, search_query: str | None = None, department: ShortDepartment | None = None):
         return self.__general_query_builder(start_time, end_time, floor_number, search_query, department).count()

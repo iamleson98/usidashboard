@@ -16,6 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 from api.ws import SocketRouter
 from api.abnormals import AbnormalRouter
+from modules.workers.aggregate_worker import run_aggregation_job
 
 
 @asynccontextmanager
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(execute_data_crawler, IntervalTrigger(seconds=env.DATA_CRAWLER_INTERVAL_SECS))
     # clear stale checking events job
     scheduler.add_job(clear_stale_events, CronTrigger(hour=0, minute=0))
+    scheduler.add_job(run_aggregation_job, CronTrigger(day_of_week='sun', hour=23, minute=59))
     scheduler.start()
     init()
     yield

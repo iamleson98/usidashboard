@@ -15,7 +15,7 @@ class BaseRepo(Generic[M, K]):
     def __init__(self, db: Session = Depends(get_db_connection)):
         self.db = db
 
-    def create(self, instance: M) -> M:
+    def create(self, instance: M) -> M | None:
         try:
             self.db.add(instance)
             self.db.commit()
@@ -44,7 +44,7 @@ class BaseRepo(Generic[M, K]):
             self.db.rollback()
             return False
 
-    def update(self, id: K, instance: M) -> M:
+    def update(self, id: K, instance: M) -> M | None:
         try:
             instance.id = id
             self.db.merge(instance)
