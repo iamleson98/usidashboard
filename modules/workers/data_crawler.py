@@ -171,8 +171,6 @@ def handle_parse_time_from_data_file_name(file_name: str):
     split_name = file_name.split("_")
     numbers = filter(lambda item: item.isdigit(), split_name)
     numbers = list(numbers)
-    if len(numbers) != 7:
-        return None
 
     return datetime.strptime(f"{numbers[0]}-{numbers[1]}-{numbers[2]} {numbers[3]}:{numbers[4]}:{numbers[5]}", DATE_FORMAT)
 
@@ -481,6 +479,37 @@ class DataCrawlerWorker(BaseWorker):
         try:
             # skip first 7 rows since those data is not needed
             dframe = pd.read_excel(full_file_path, sheet_name=self.SHEET_NAME, skiprows=7, engine='openpyxl')
+            dframe = dframe.sort_values(by=[TIME], ascending=True)
+
+            result = {
+                '1': {},
+                '2': {},
+                '3': {},
+                '4': {},
+            }
+
+            for _, item in dframe.iterrows():
+                access_point = item.get(ACCESS_POINT, "")
+
+                if not access_point:
+                    continue
+
+                access_point: str = access_point.strip().lower()
+
+                employee_id = item.get(PERSON_NO, "")
+                if not employee_id:
+                    continue
+
+                employee_id: str = employee_id.strip().upper()
+
+                if "face" in access_point:
+                    floor = access_point[7]
+                    result[floor][employee_id] = None
+                else:
+                    floor = access_point[6]
+                    if employee_id in result[floor]:
+                        del result[floor][employee_id]
+
 
             FLOOR_NUMBERS = ['1', '2', '3', '4']
 
@@ -490,12 +519,9 @@ class DataCrawlerWorker(BaseWorker):
                 live_count={},
             )
 
-            for floor_no in FLOOR_NUMBERS:
-                checkins = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") >= 0) & (dframe[ACCESS_POINT].str.strip().str.get(7) == floor_no)].shape[0]
-                checkouts = dframe.loc[(dframe[ACCESS_POINT].str.lower().str.find("face") == -1) & (dframe[ACCESS_POINT].str.strip().str.get(6) == floor_no)].shape[0]
+            for floor in FLOOR_NUMBERS:
+                new_aggregation.live_count[f"floor {floor}"] = len(result[floor])
 
-                new_aggregation.live_count[f"floor {floor_no}"] = checkins - checkouts
-            
             normalized_aggrs.live_attendances.append(new_aggregation)
             normalized_aggrs.updated_at = crawl_time
 
