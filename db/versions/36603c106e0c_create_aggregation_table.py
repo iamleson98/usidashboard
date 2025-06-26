@@ -30,7 +30,15 @@ def upgrade() -> None:
         sa.Column("live_attendances", sa.JSON),
     )
 
-    op.execute(r"INSERT INTO aggregations (live_attendances, updated_at) VALUES ('{}', NOW())")
+    # op.execute(r"INSERT INTO aggregations (live_attendances, updated_at) VALUES ('{}', NOW())")
+    op.execute("""
+        INSERT INTO aggregations (live_attendances, updated_at)
+        VALUES (
+            '[{"time": "2025-06-25 16:00:31", "live_count": {"floor 1": 242, "floor 2": 298, "floor 3": 259, "floor 4": 0}}]',
+            CURRENT_TIMESTAMP
+        )
+    """)
+
 
 
 def downgrade() -> None:

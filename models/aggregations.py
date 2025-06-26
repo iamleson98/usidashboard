@@ -15,10 +15,19 @@ class Aggregation(EntityMeta):
     live_attendances = sa.Column(sa.JSON)
 
     def normalize(self) -> AggregationSchema:
-        live_attendances = json.loads(self.live_attendances)
-        live_attendances = map(lambda item: json.loads(item), live_attendances)
-        # live_attendances = map(lambda item: datetime.fromisoformat(item["time"]), live_attendances)
-        res = AggregationSchema(id=self.id, updated_at=self.updated_at, live_attendances=list(live_attendances))
+        # print(type(self.live_attendances))
+        # if type(self.live_attendances) is str:
+        #     live_attendances = json.loads(self.live_attendances)
+        # else:
+        #     live_attendances = self.live_attendances
+        records = []
+        for item in self.live_attendances:
+            if type(item) is str:
+                item = json.loads(item)
+
+            records.append(AttendaceRecord(time=item['time'], live_count=item['live_count']))
+        # live_attendances = map(lambda item: AttendaceRecord(time=item['time'], live_count=item['live_count']), self.live_attendances)
+        res = AggregationSchema(id=self.id, updated_at=self.updated_at, live_attendances=records)
         return res
     
     @staticmethod
@@ -27,9 +36,7 @@ class Aggregation(EntityMeta):
         res = Aggregation(
             id=schema.id,
             updated_at=schema.updated_at,
-            live_attendances=json.dumps(list(records)),
+            live_attendances=list(records),
         )
-        # data = {}
-        # for item in schema.live_attendances:
         return res
 
