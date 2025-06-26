@@ -1,4 +1,4 @@
-import{d as g,r as s,G as i,H as l,c,a6 as f,u as d,O as b,t as _,ag as m,o as t,a,J as y}from"./@vue.BDy9tIRg.2025-06-26_1059.js";const k=["innerHTML"],T=["innerHTML"],v=["src","alt"],M=g({__name:"document",setup(w){const o=s([{title:"Project objective",shortDesc:"The main dashboard for managing abnormal checking time, production line heads count by realtime",content:""},{title:"Authors",content:`
+import{d as g,r as s,G as i,H as l,c,a6 as f,u as d,O as b,t as _,ag as m,o as t,a,J as y}from"./@vue.BDy9tIRg.2025-06-26_1113.js";const k=["innerHTML"],T=["innerHTML"],v=["src","alt"],M=g({__name:"document",setup(w){const o=s([{title:"Project objective",shortDesc:"The main dashboard for managing abnormal checking time, production line heads count by realtime",content:""},{title:"Authors",content:`
     Yunfu Xiang - Test department leader, project manager <br />
     Nickson Le - nickson_le@usiglobal.com (core maintainer) <br />
     Mac Pham - Supporter <br />
