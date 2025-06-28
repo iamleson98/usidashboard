@@ -1,10 +1,10 @@
 from modules.workers.base_worker import BaseWorker
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from repositories.checkout_events import CheckingEventRepo
 from repositories.employee import EmployeeRepo
 from repositories.abnormal_checking import AbnormalCheckingRepo
 from collections import defaultdict
-import calendar
+
 
 class DataAggregateWorker(BaseWorker):
     NAME = "DataAggregateWorker"

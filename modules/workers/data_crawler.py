@@ -23,7 +23,7 @@ from dto.employee import ShortDepartment
 from dto.aggregation import AttendaceRecord
 import math
 from configs.env import env
-import polars as pl
+
 
 # Please not that at the time of developing this system (May/2025), the allowed rest times for each department are specified in the picture "image.png" in folder data
 # I am not responsible for later changes to the official timing schedules of those.
@@ -50,7 +50,7 @@ ACCESS_POINT = "Access Point"
 TIME = "Time"
 DEPARTMENT = "Department"
 ALLOWED_GAP_MINS = 10
-TWELVE_HOURS_MINS = 60 * 12
+TWELVE_HOURS_MINS = 600
 # ALLOWED_BREAK_MINS = 60 # meal + rest time
 
 
@@ -465,7 +465,7 @@ class DataCrawlerWorker(BaseWorker):
 
         if not file_exist:
             return FileNotFoundError(f"handle_aggregate: the file path {full_file_path} does not exist.")
-        
+
         # the time must be the time this file is exported, this ensure the integrity of result data
         crawl_time: datetime = handle_parse_time_from_data_file_name(file_name)
 
